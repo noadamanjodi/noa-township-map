@@ -146,11 +146,11 @@
 
 const state = {
   currentSector: 1,
-  images: {
-    1: "sector1.png",
-    2: "sector2.png",
-    3: "sector3.png"
-  },
+images: {
+  1: "./sector1.png",
+  2: "./sector2.png",
+  3: "./sector3.png"
+},
   data: { 1:[], 2:[], 3:[] },
   drawingLayer: {},
   editor: false,
@@ -180,7 +180,10 @@ async function loadSector(sector) {
   const img = new Image();
   img.src = url;
 
-  await img.decode().catch(() => {});
+ await new Promise(resolve => {
+  img.onload = resolve;
+  img.onerror = resolve;
+});
 
   const w = img.width || 2000;
   const h = img.height || 1200;
