@@ -390,8 +390,24 @@ document.getElementById("toggleEditor").onclick = () => {
   document.getElementById("toggleEditor").innerText =
     APP.editor ? "Disable Drawing" : "Enable Drawing";
 
-  if (APP.editor) map.addControl(drawControl);
-  else map.removeControl(drawControl);
+if (APP.editor) {
+    map.addControl(drawControl);
+
+    // SAFETY FIX: If toolbar fails to appear, disable editor
+    setTimeout(() => {
+        const toolbar = document.querySelector(".leaflet-draw-toolbar-top");
+        if (!toolbar) {
+            alert("Drawing toolbar cannot be displayed. Drawing mode disabled.");
+            APP.editor = false;
+            map.removeControl(drawControl);
+            document.getElementById("toggleEditor").innerText = "Enable Drawing";
+        }
+    }, 300);
+} 
+else {
+    map.removeControl(drawControl);
+}
+
 };
 
 /* ======================================================
