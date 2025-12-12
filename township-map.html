@@ -10,6 +10,18 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 
 <style>
+  /* Force Leaflet Draw toolbar to stay visible above sidebar */
+.leaflet-draw {
+  z-index: 5000 !important;
+}
+
+.leaflet-draw-toolbar {
+  position: absolute !important;
+  left: 10px !important;
+  top: 70px !important;
+  z-index: 5001 !important;
+}
+
 html,body{
   height:100%;
   margin:0;
@@ -393,20 +405,27 @@ document.getElementById("toggleEditor").onclick = () => {
 if (APP.editor) {
     map.addControl(drawControl);
 
-    // SAFETY FIX: If toolbar fails to appear, disable editor
+    // Fix: Force toolbar to appear
     setTimeout(() => {
-        const toolbar = document.querySelector(".leaflet-draw-toolbar-top");
+        const toolbar = document.querySelector(".leaflet-draw-toolbar");
         if (!toolbar) {
-            alert("Drawing toolbar cannot be displayed. Drawing mode disabled.");
+            alert("Drawing toolbar failed to load. Drawing disabled.");
             APP.editor = false;
             map.removeControl(drawControl);
             document.getElementById("toggleEditor").innerText = "Enable Drawing";
+        } else {
+            // Force its position
+            toolbar.style.zIndex = "5001";
+            toolbar.style.position = "absolute";
+            toolbar.style.left = "10px";
+            toolbar.style.top = "70px";
         }
-    }, 300);
+    }, 400);
 } 
 else {
     map.removeControl(drawControl);
 }
+
 
 };
 
