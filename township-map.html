@@ -1,240 +1,411 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Township Map – Interactive Finder</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta charset="utf-8" />
+  <title>Township Map – Interactive Finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 
-<!-- Prevent Google Sites iframe scroll issues -->
-<style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    overflow: hidden; 
-    font-family: Arial, sans-serif;
-    background: #f5f7fb;
-  }
-  #wrapper {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-  header {
-    background: #003f88;
-    padding: 12px 16px;
-    color: white;
-    font-size: 18px;
-    font-weight: 600;
-  }
-  #main {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-  }
-  #sidebar {
-    width: 250px;
-    min-width: 240px;
-    background: white;
-    padding: 12px;
-    overflow-y: auto;
-    box-shadow: 2px 0 6px rgba(0,0,0,0.08);
-  }
-  #map {
-    flex: 1;
-    height: 100%;
-  }
-  .panel {
-    margin-bottom: 16px;
-    padding: 12px;
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(10,20,40,0.06);
-  }
-  label {
-    font-size: 13px;
-    margin-bottom: 4px;
-    display: block;
-  }
-  input[type="text"] {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccd4e0;
-    border-radius: 6px;
-    box-sizing: border-box;
-  }
-  .btn {
-    padding: 8px 10px;
-    background: #ffd24d;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-  }
-  .tab {
-    padding: 8px;
-    background: #e8eefc;
-    margin-bottom: 6px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  .tab.active {
-    background: #c8dafc;
-    font-weight: 700;
-  }
-</style>
+  <!-- Leaflet CSS (kept external) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-<!-- Leaflet libraries -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet Draw CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 
-<!-- Leaflet.draw -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <style>
+    /* ---------- Page reset ---------- */
+    html,body{height:100%;margin:0;padding:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    :root{
+      --sidebar-w:320px;
+      --accent:#003f88;
+      --panel-bg:#ffffff;
+      --muted:#6b7890;
+      --btn:#ffd24d;
+    }
+
+    /* ---------- App layout ---------- */
+    .app {
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      background:#f5f7fb;
+    }
+
+    header.app-header {
+      background:var(--accent);
+      color:white;
+      padding:12px 16px;
+      font-weight:600;
+      font-size:18px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .content {
+      flex:1;
+      display:flex;
+      min-height:0; /* allow children to shrink for overflow */
+    }
+
+    /* Sidebar left */
+    .sidebar {
+      width:var(--sidebar-w);
+      min-width:260px;
+      background:var(--panel-bg);
+      box-shadow:2px 0 8px rgba(20,30,60,0.06);
+      padding:14px;
+      box-sizing:border-box;
+      overflow:auto;
+    }
+
+    .panel {
+      background:var(--panel-bg);
+      border-radius:8px;
+      padding:10px;
+      margin-bottom:12px;
+      box-shadow:0 6px 18px rgba(10,20,40,0.04);
+    }
+
+    .tabs { display:flex; flex-direction:column; gap:8px; }
+    .tab {
+      padding:12px;
+      border-radius:8px;
+      background:#eef4ff;
+      cursor:pointer;
+      font-weight:600;
+      color:#123;
+      text-align:left;
+      border:1px solid rgba(10,20,40,0.04);
+    }
+    .tab.active { background:#cfe1ff; color: #02284b; }
+
+    label.small { font-size:13px; color:var(--muted); margin-bottom:6px; display:block; }
+
+    input[type="text"], input[type="search"] {
+      width:100%;
+      padding:8px 10px;
+      border-radius:8px;
+      border:1px solid #e1e7f0;
+      box-sizing:border-box;
+      font-size:14px;
+    }
+
+    .btn {
+      display:inline-block;
+      width:100%;
+      padding:10px 12px;
+      border-radius:8px;
+      border:none;
+      cursor:pointer;
+      background:var(--btn);
+      font-weight:700;
+      margin-top:8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .btn.alt { background:#d4ed70; }
+    .btn.blue { background:#b7d9ff; color:#032a50; }
+
+    /* Map container */
+    .map-wrap {
+      flex:1;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      position:relative;
+      overflow:hidden;
+      background: #e9e9e9;
+    }
+
+    #map {
+      flex:1;
+      width:100%;
+      height:100%;
+      background: #dcdcdc;
+    }
+
+    /* small zoom controls column */
+    .zoom-col {
+      position:absolute;
+      left: var(--sidebar-w);
+      top: 16px;
+      z-index: 1200;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      padding-left:8px;
+    }
+
+    /* responsive */
+    @media (max-width:900px){
+      .sidebar{ display:none; } /* hide sidebar on very small screens - use full screen map */
+      .zoom-col { left:8px; }
+    }
+
+    /* tooltip styling for drawn boxes */
+    .leaflet-tooltip.my-tooltip {
+      background: rgba(0,0,0,0.7);
+      color: white;
+      border-radius:4px;
+      padding:4px 8px;
+      font-size:13px;
+    }
+  </style>
 
 </head>
 <body>
+  <div class="app">
+    <header class="app-header">Interactive Township Map (Sector 1 • Sector 2 • Sector 3)</header>
 
-<div id="wrapper">
+    <div class="content">
+      <!-- SIDEBAR LEFT -->
+      <aside class="sidebar" id="sidebar">
 
-<header>Interactive Township Map (Sector 1 • Sector 2 • Sector 3)</header>
+        <div class="panel">
+          <div class="tabs" role="tablist" aria-label="Sector tabs">
+            <div class="tab active" data-sector="1" role="tab">Sector 1</div>
+            <div class="tab" data-sector="2" role="tab">Sector 2</div>
+            <div class="tab" data-sector="3" role="tab">Sector 3</div>
+          </div>
+        </div>
 
-<div id="main">
+        <div class="panel">
+          <label class="small">Search Block (example: B-720 or A-57)</label>
+          <input id="searchInput" type="search" placeholder="B-720 or A-57" />
+          <button id="searchBtn" class="btn" style="margin-top:10px;">Find</button>
+        </div>
 
-<!-- SIDEBAR -->
-<div id="sidebar">
+        <div class="panel">
+          <label class="small">Admin Mode</label>
+          <button id="toggleEditor" class="btn" style="background:#f7c86c;">Enable Drawing</button>
+          <button id="downloadJSON" class="btn alt">Download JSON</button>
+          <button id="loadJSON" class="btn blue">Load JSON File</button>
+          <input id="fileInput" type="file" accept=".json" style="display:none" />
+          <div style="margin-top:8px;font-size:12px;color:var(--muted)">Draw one rectangle per labeled box and enter the range (e.g. B-529-540). Then Download JSON to save your work.</div>
+        </div>
 
-  <div class="panel">
-    <div class="tab active" data-sector="1">Sector 1</div>
-    <div class="tab" data-sector="2">Sector 2</div>
-    <div class="tab" data-sector="3">Sector 3</div>
+        <div class="panel">
+          <label class="small">Image filenames (must match these names)</label>
+          <div style="font-size:13px;color:var(--muted);">sector1.png • sector2.png • sector3.png</div>
+        </div>
+
+      </aside>
+
+      <!-- MAP AREA -->
+      <div class="map-wrap">
+        <div class="zoom-col" aria-hidden="true">
+          <!-- Leaflet will also add controls; these are decorative fallback -->
+        </div>
+
+        <div id="map" role="application" aria-label="Township map viewer"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="panel">
-    <label>Search Block</label>
-    <input id="searchBox" placeholder="Example: B-720 or A-57">
-    <button id="btnSearch" class="btn" style="margin-top:8px;width:100%;">Find</button>
-  </div>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <div class="panel">
-    <label>Admin Mode</label>
-    <button id="btnAdmin" class="btn" style="width:100%;background:#f7c86c;">Enable Drawing</button>
+  <!-- Leaflet.draw JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-    <button id="btnDownload" class="btn" style="margin-top:8px;width:100%;background:#d4ed70;">
-      Download JSON
-    </button>
+  <!-- PART 2 HERE -->
+  <script>
+/* ============================================================
+   PART 2 — MAP ENGINE, IMAGE LOADING, SECTOR SWITCHING, SEARCH
+   Uses your exact PNG dimensions: 4400 × 3080
+   ============================================================ */
 
-    <button id="btnLoad" class="btn" style="margin-top:8px;width:100%;background:#b7d9ff;">
-      Load JSON File
-    </button>
+const IMG_W = 4400;   // width of all sector images
+const IMG_H = 3080;   // height of images
 
-    <input type="file" id="jsonLoader" style="display:none" accept=".json">
-  </div>
-
-</div>
-
-<!-- MAP AREA -->
-<div id="map"></div>
-
-</div></div>
-
-<script>
-
-/* ---------------------------------------------------------
-    CORE APP STATE
------------------------------------------------------------- */
-
-const state = {
+/* ---------- App State ---------- */
+const APP = {
   currentSector: 1,
-images: {
-  1: "./sector1.png",
-  2: "./sector2.png",
-  3: "./sector3.png"
-},
-  data: { 1:[], 2:[], 3:[] },
-  drawingLayer: {},
-  editor: false,
-  counter: 0
+  images:{
+    1: "./sector1.png",
+    2: "./sector2.png",
+    3: "./sector3.png"
+  },
+  data:{
+    1:[], 2:[], 3:[]
+  },
+  drawingLayer:{},
+  editor:false,
+  counter:0
 };
 
-/* ---------------------------------------------------------
-    MAP INITIALIZATION
------------------------------------------------------------- */
-
+/* ---------- Initialize Leaflet Map ---------- */
 const map = L.map("map", {
   crs: L.CRS.Simple,
+  minZoom: -4,
+  maxZoom: 4,
   zoomSnap: 0.2,
-  minZoom: -4
+  zoomDelta: 0.5,
+  attributionControl:false
 });
 
-let imgOverlay;
+let imgOverlay = null;
 
-/* ---------------------------------------------------------
-    LOAD SECTOR MAP IMAGE
------------------------------------------------------------- */
+/* ---------- Compute bounds for a 4400×3080 image ---------- */
+function imageBounds(){
+  // Convert pixel coordinates to map lat/lng using unproject
+  const southWest = map.unproject([0, IMG_H], map.getMaxZoom());
+  const northEast = map.unproject([IMG_W, 0], map.getMaxZoom());
+  return L.latLngBounds(southWest, northEast);
+}
 
-async function loadSector(sector) {
-  state.currentSector = sector;
+/* ---------- Load a sector's background image ---------- */
+async function loadSector(sector){
+  APP.currentSector = sector;
 
-  const url = state.images[sector];
+  const url = APP.images[sector];
   const img = new Image();
   img.src = url;
 
- await new Promise(resolve => {
-  img.onload = resolve;
-  img.onerror = resolve;
-});
+  // Make sure the image fully loads
+  await new Promise(resolve=>{
+    img.onload = resolve;
+    img.onerror = resolve;
+  });
 
-  const w = img.width || 2000;
-  const h = img.height || 1200;
+  const bounds = imageBounds();
 
-  const southWest = map.unproject([0, h], map.getMaxZoom());
-  const northEast = map.unproject([w, 0], map.getMaxZoom());
-  const bounds = new L.LatLngBounds(southWest, northEast);
+  if(imgOverlay){
+    map.removeLayer(imgOverlay);
+  }
 
-  if (imgOverlay) map.removeLayer(imgOverlay);
-
-  imgOverlay = L.imageOverlay(url, bounds).addTo(map);
+  imgOverlay = L.imageOverlay(url, bounds);
+  imgOverlay.addTo(map);
 
   map.setMaxBounds(bounds);
   map.fitBounds(bounds);
 
-  // drawing layer
-  if (!state.drawingLayer[sector]) {
-    state.drawingLayer[sector] = L.featureGroup().addTo(map);
+  // Drawing layers
+  if(!APP.drawingLayer[sector]){
+    APP.drawingLayer[sector] = L.featureGroup().addTo(map);
   }
 
-  Object.keys(state.drawingLayer).forEach(s=>{
-    if (parseInt(s) !== sector) map.removeLayer(state.drawingLayer[s]);
+  // Hide other sectors
+  Object.keys(APP.drawingLayer).forEach(s=>{
+    if(Number(s)!==sector){
+      map.removeLayer(APP.drawingLayer[s]);
+    }
   });
 
-  state.drawingLayer[sector].addTo(map);
-  renderStoredRectangles(sector);
+  APP.drawingLayer[sector].addTo(map);
+
+  renderRectangles(sector);
 }
 
-/* ---------------------------------------------------------
-    EXPAND RANGE STR (A-57-64 → [A-57,A-58,...])
------------------------------------------------------------- */
+/* ---------- Render saved rectangles for a sector ---------- */
+function renderRectangles(sector){
+  const grp = APP.drawingLayer[sector];
+  grp.clearLayers();
 
-function expandRange(str) {
+  APP.data[sector].forEach(item=>{
+    const rect = L.rectangle(item.boundsLatLng, {
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:0.35
+    }).addTo(grp);
+
+    rect.bindTooltip(item.rangeText, {className:"my-tooltip"});
+    item._layer = rect;
+  });
+}
+
+/* ---------- Helper: Expand "B-720-725" to ["B-720","B-721",..] ---------- */
+function expandRange(str){
   str = str.replace(/\s+/g,"").toUpperCase();
   const m = str.match(/^([A-Z])[-]?(\d+)(?:-(\d+))?$/);
-  if (!m) return [];
+  if(!m) return [];
+
   const letter = m[1];
   const start = Number(m[2]);
   const end = m[3] ? Number(m[3]) : start;
   const lo = Math.min(start,end);
   const hi = Math.max(start,end);
 
-  const arr = [];
-  for (let i=lo; i<=hi; i++) arr.push(`${letter}-${i}`);
-  return arr;
+  const out=[];
+  for(let i=lo;i<=hi;i++){
+    out.push(`${letter}-${i}`);
+  }
+  return out;
 }
 
-/* ---------------------------------------------------------
-    ADMIN: DRAW RECTANGLE
------------------------------------------------------------- */
+/* ---------- SEARCH Feature ---------- */
+document.getElementById("searchBtn").onclick = ()=>{
+  const raw = document.getElementById("searchInput").value.trim().toUpperCase();
+  if(!raw){ alert("Enter block: B-720 or A-57"); return; }
 
+  const m = raw.match(/^([A-Z])[-]?(\d+)$/);
+  if(!m){ alert("Use format A-57 or B-720"); return; }
+
+  const key = `${m[1]}-${m[2]}`;
+
+  let found=null;
+
+  // Search in current sector first, then others
+  [APP.currentSector,1,2,3].forEach(sec=>{
+    if(found) return;
+    APP.data[sec].forEach(block=>{
+      if(block.expanded.includes(key)){
+        found={sector:sec, block};
+      }
+    });
+  });
+
+  if(!found){
+    alert("Block not found in any sector.");
+    return;
+  }
+
+  // Switch sector if required
+  if(found.sector !== APP.currentSector){
+    document.querySelectorAll(".tab").forEach(t=>{
+      t.classList.toggle("active", Number(t.dataset.sector)==found.sector);
+    });
+    loadSector(found.sector);
+  }
+
+  setTimeout(()=>{
+    const layer = found.block._layer;
+    if(!layer) return;
+
+    const b = layer.getBounds();
+    map.fitBounds(b.pad(0.35));
+    layer.setStyle({color:"#ffee00",weight:4,fillOpacity:0.6});
+
+    setTimeout(()=>{
+      layer.setStyle({color:"#ff9800",weight:2,fillOpacity:0.35});
+    },3000);
+  },600);
+};
+
+/* ---------- Sector Tab Click ---------- */
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+
+    const sec = Number(tab.dataset.sector);
+    loadSector(sec);
+  };
+});
+
+// Initial load
+loadSector(1);
+</script>
+
+
+  <!-- PART 3 HERE -->
+  <script>
+/* ============================================================
+   PART 3 — ADMIN DRAWING, JSON SAVE/LOAD, FINAL INITIALIZATION
+   ============================================================ */
+
+/* ---------- Leaflet Draw Tools ---------- */
 const drawControl = new L.Control.Draw({
   draw: {
     marker:false,
@@ -242,168 +413,118 @@ const drawControl = new L.Control.Draw({
     circlemarker:false,
     polyline:false,
     polygon:false,
-    rectangle: { shapeOptions:{ color:"#ff9800", weight:2 } }
-  }
+    rectangle:{
+      shapeOptions:{
+        color:"#ff9800",
+        weight:2,
+        fillColor:"#ffd280",
+        fillOpacity:0.35
+      }
+    }
+  },
+  edit:false
 });
 
-document.getElementById("btnAdmin").onclick = () => {
-  state.editor = !state.editor;
-  document.getElementById("btnAdmin").textContent =
-    state.editor ? "Disable Drawing" : "Enable Drawing";
+/* ---------- Enable / Disable Drawing ---------- */
+document.getElementById("toggleEditor").onclick = ()=>{
+  APP.editor = !APP.editor;
 
-  if (state.editor) map.addControl(drawControl);
-  else map.removeControl(drawControl);
+  document.getElementById("toggleEditor").textContent =
+    APP.editor ? "Disable Drawing" : "Enable Drawing";
+
+  if(APP.editor){
+    map.addControl(drawControl);
+  } else {
+    map.removeControl(drawControl);
+  }
 };
 
-map.on(L.Draw.Event.CREATED, e => {
-  if (!state.editor) return;
-  const layer = e.layer;
-  const range = prompt("Enter block range (e.g. B-529-540 or A-57):");
+/* ---------- Handle Rectangle Creation ---------- */
+map.on(L.Draw.Event.CREATED, e=>{
+  if(!APP.editor) return;
 
-  if (!range) return;
+  const layer = e.layer;
+
+  // Ask user for block range text
+  const range = prompt("Enter block range (Example: B-529-540 or A-57):");
+  if(!range) return;
 
   const expanded = expandRange(range);
+  if(expanded.length === 0){
+    alert("Invalid range format. Use A-57 or B-529-540");
+    return;
+  }
+
   const b = layer.getBounds();
+
   const item = {
-    id: "id_"+(++state.counter),
-    sector: state.currentSector,
+    id: "id_"+(++APP.counter),
+    sector: APP.currentSector,
     rangeText: range.toUpperCase(),
-    expanded,
+    expanded: expanded,
     boundsLatLng: [
       [b.getSouth(), b.getWest()],
       [b.getNorth(), b.getEast()]
     ]
   };
-  state.data[state.currentSector].push(item);
 
-  layer.bindTooltip(item.rangeText);
-  state.drawingLayer[state.currentSector].addLayer(layer);
+  APP.data[APP.currentSector].push(item);
+
+  // Attach tooltip
+  layer.bindTooltip(item.rangeText, {className:"my-tooltip"});
+
+  // Add to drawing layer
+  APP.drawingLayer[APP.currentSector].addLayer(layer);
+
+  alert("Block saved.");
 });
 
-/* ---------------------------------------------------------
-    RENDER SAVED RECTANGLES
------------------------------------------------------------- */
-
-function renderStoredRectangles(sector) {
-  const grp = state.drawingLayer[sector];
-  grp.clearLayers();
-
-  state.data[sector].forEach(item => {
-    const r = L.rectangle(item.boundsLatLng, {
-      color:"#ff9800",
-      weight:2,
-      fillColor:"#ffd280",
-      fillOpacity:0.35
-    }).addTo(grp);
-
-    r.bindTooltip(item.rangeText);
-    item._layer = r;
-  });
-}
-
-/* ---------------------------------------------------------
-    SEARCH FUNCTION
------------------------------------------------------------- */
-
-document.getElementById("btnSearch").onclick = () => {
-  const val = document.getElementById("searchBox").value.trim().toUpperCase();
-  if (!val) return alert("Enter A-57 or B-720");
-
-  const m = val.match(/^([A-Z])[-]?(\d+)$/);
-  if (!m) return alert("Use format A-57 or B-720");
-
-  const letter = m[1];
-  const num = Number(m[2]);
-  const key = `${letter}-${num}`;
-
-  let found = null;
-
-  [state.currentSector,1,2,3].forEach(sec => {
-    if (found) return;
-    state.data[sec].forEach(block => {
-      if (block.expanded.includes(key)) {
-        found = { block, sector: sec };
-      }
-    });
-  });
-
-  if (!found) return alert("Block not found");
-
-  // switch sector if required
-  if (found.sector !== state.currentSector) {
-    document.querySelectorAll(".tab").forEach(t =>
-      t.classList.toggle("active", Number(t.dataset.sector) === found.sector)
-    );
-    loadSector(found.sector);
-  }
-
-  // highlight
-  setTimeout(() => {
-    const r = found.block._layer;
-    if (!r) return;
-
-    r.setStyle({ color:"#ffeb3b", weight:4, fillOpacity:0.6 });
-    map.fitBounds(r.getBounds().pad(0.3));
-
-    setTimeout(()=>{
-      r.setStyle({ color:"#ff9800", weight:2, fillOpacity:0.35 });
-    }, 3000);
-  }, 400);
-};
-
-/* ---------------------------------------------------------
-    JSON EXPORT/IMPORT
------------------------------------------------------------- */
-
-document.getElementById("btnDownload").onclick = () => {
-  const obj = { sectors: state.data };
-  const blob = new Blob([JSON.stringify(obj,null,2)], {type:"application/json"});
+/* ---------- JSON Download ---------- */
+document.getElementById("downloadJSON").onclick = ()=>{
+  const json = JSON.stringify({sectors:APP.data}, null, 2);
+  const blob = new Blob([json], {type:"application/json"});
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
   a.download = "township_map_ranges.json";
   a.click();
+
   URL.revokeObjectURL(url);
 };
 
-document.getElementById("btnLoad").onclick = () => {
-  document.getElementById("jsonLoader").click();
+/* ---------- JSON Upload ---------- */
+document.getElementById("loadJSON").onclick = ()=>{
+  document.getElementById("fileInput").click();
 };
 
-document.getElementById("jsonLoader").onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
+document.getElementById("fileInput").onchange = evt=>{
+  const file = evt.target.files[0];
+  if(!file) return;
 
   const reader = new FileReader();
-  reader.onload = evt => {
-    try {
-      const json = JSON.parse(evt.target.result);
-      state.data = json.sectors;
-      renderStoredRectangles(state.currentSector);
-      alert("JSON Loaded!");
-    } catch(err) {
-      alert("Invalid JSON file");
+  reader.onload = ev=>{
+    try{
+      const json = JSON.parse(ev.target.result);
+
+      APP.data = json.sectors;
+
+      // Re-render current sector
+      renderRectangles(APP.currentSector);
+
+      alert("JSON Loaded Successfully!");
+
+    } catch(err){
+      alert("Invalid JSON file.");
     }
   };
+
   reader.readAsText(file);
 };
 
-/* ---------------------------------------------------------
-    TAB CLICK HANDLING
------------------------------------------------------------- */
-
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.onclick = () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    loadSector(Number(tab.dataset.sector));
-  };
-});
-
-// INITIAL LOAD
-loadSector(1);
-
+/* ---------- END OF PART 3 ---------- */
 </script>
+
 
 </body>
 </html>
