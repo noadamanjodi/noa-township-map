@@ -1,79 +1,117 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Township Map – Interactive Finder</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<meta charset="utf-8" />
+<title>Township Map – Interactive Finder</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
 
-  <style>
-    html,body{height:100%;margin:0;padding:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;}
-    :root{
-      --sidebar:320px;
-      --accent:#003f88;
-      --panel:#ffffff;
-      --muted:#6b7890;
-      --btn:#ffd24d;
-    }
+<style>
+html,body{
+  height:100%;
+  margin:0;
+  padding:0;
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+}
+:root{
+  --sidebar:320px;
+  --accent:#003f88;
+  --panel:#ffffff;
+  --muted:#6b7890;
+  --btn:#ffd24d;
+}
+.app{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:#f5f7fb;
+}
+header{
+  background:var(--accent);
+  color:white;
+  padding:12px 16px;
+  font-size:18px;
+  font-weight:600;
+}
+.content{
+  flex:1;
+  display:flex;
+  min-height:0;
+}
+.sidebar{
+  width:var(--sidebar);
+  min-width:260px;
+  padding:14px;
+  background:white;
+  box-shadow:2px 0 8px rgba(0,0,0,0.08);
+  overflow:auto;
+}
+.panel{
+  background:var(--panel);
+  padding:12px;
+  border-radius:10px;
+  margin-bottom:14px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.06);
+}
+.tab{
+  padding:12px;
+  background:#eef4ff;
+  margin-bottom:8px;
+  border-radius:8px;
+  font-weight:600;
+  cursor:pointer;
+}
+.tab.active{
+  background:#cfe1ff;
+}
+label.small{
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:6px;
+  display:block;
+}
+input[type="search"]{
+  width:100%;
+  padding:10px;
+  border:1px solid #d7dfea;
+  border-radius:8px;
+  font-size:14px;
+}
+.btn{
+  width:100%;
+  padding:10px;
+  border:none;
+  border-radius:8px;
+  margin-top:8px;
+  background:var(--btn);
+  cursor:pointer;
+  font-weight:700;
+  box-shadow:0 2px 6px rgba(0,0,0,0.06);
+}
+.btn.alt{ background:#d4ed70; }
+.btn.blue{ background:#b7d9ff; }
+#map{
+  width:100%;
+  height:100%;
+}
+.leaflet-tooltip.my-tooltip{
+  background:rgba(0,0,0,0.7);
+  color:white;
+  padding:3px 7px;
+  border-radius:4px;
+  font-size:13px;
+}
+</style>
 
-    .app{height:100vh;display:flex;flex-direction:column;background:#f5f7fb;}
-    header{background:var(--accent);color:white;padding:12px 16px;font-size:18px;font-weight:600;}
-
-    .content{flex:1;display:flex;min-height:0;}
-
-    .sidebar{
-      width:var(--sidebar);
-      min-width:260px;
-      padding:14px;
-      background:white;
-      box-shadow:2px 0 8px rgba(0,0,0,0.08);
-      overflow:auto;
-    }
-
-    .panel{
-      background:var(--panel);
-      padding:12px;
-      border-radius:10px;
-      margin-bottom:14px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.06);
-    }
-
-    .tab{padding:12px;background:#eef4ff;margin-bottom:8px;border-radius:8px;font-weight:600;cursor:pointer;}
-    .tab.active{background:#cfe1ff;}
-
-    label.small{font-size:13px;color:var(--muted);margin-bottom:6px;display:block;}
-
-    input[type="search"]{
-      width:100%;padding:10px;border:1px solid #d7dfea;border-radius:8px;font-size:14px;
-    }
-
-    .btn{
-      width:100%;padding:10px;border:none;border-radius:8px;margin-top:8px;
-      background:var(--btn);cursor:pointer;font-weight:700;
-      box-shadow:0 2px 6px rgba(0,0,0,0.06);
-    }
-    .btn.alt{background:#d4ed70;}
-    .btn.blue{background:#b7d9ff;}
-
-    .map-wrap{flex:1;position:relative;background:#e9e9e9;}
-    #map{width:100%;height:100%;}
-
-    .leaflet-tooltip.my-tooltip{
-      background:rgba(0,0,0,0.7);
-      color:white;
-      padding:3px 7px;
-      border-radius:4px;
-      font-size:13px;
-    }
-  </style>
 </head>
-
 <body>
+
 <div class="app">
-<header>Interactive Township Map (Sector 1 • Sector 2)</header>
+
+<header>Interactive Township Map (Sector 1 • Sector 2 • Sector 3)</header>
 
 <div class="content">
 
@@ -83,20 +121,19 @@
     <div class="panel">
       <div class="tab active" data-sector="1">Sector 1</div>
       <div class="tab" data-sector="2">Sector 2</div>
+      <div class="tab" data-sector="3">Sector 3</div>
     </div>
 
     <div class="panel">
-      <label class="small">Search Block (Example: B-720 or A-57)</label>
+      <label class="small">Search Block (e.g., B-720 or A-57)</label>
       <input id="searchBox" type="search" placeholder="Enter block" />
       <button class="btn" id="searchBtn">Find</button>
     </div>
 
-    <!-- Admin Login -->
     <div class="panel">
       <button id="adminLoginBtn" class="btn" style="background:#ffd36c;">Admin Login</button>
     </div>
 
-    <!-- ADMIN PANEL (Hidden until login) -->
     <div class="panel" id="adminPanel" style="display:none;">
       <label class="small">Admin Tools</label>
 
@@ -112,7 +149,7 @@
   </aside>
 
   <!-- Map -->
-  <div class="map-wrap">
+  <div style="flex:1; background:#e9e9e9;">
     <div id="map"></div>
   </div>
 
@@ -123,42 +160,51 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-
-<!-- ============================================================
-     PART 2 — MAP ENGINE + IMAGE LOADING + SEARCH
-============================================================ -->
 <script>
+/* ==================================================
+   CORE STATE
+================================================== */
 const IMG_W = 4400, IMG_H = 3080;
 
 const APP = {
   currentSector: 1,
-  images:{1:"./sector1.png",2:"./sector2.png"},
-  data:{1:[],2:[]},
+  images:{1:"./sector1.png",2:"./sector2.png",3:"./sector3.png"},
+  data:{1:[],2:[],3:[]},
   drawingLayer:{},
   editor:false,
   counter:0
 };
 
-/* Initialize Map */
-const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4,maxZoom:4,zoomSnap:0.2});
+const map = L.map("map", {
+  crs:L.CRS.Simple,
+  minZoom:-4,
+  maxZoom:4,
+  zoomSnap:0.2
+});
 
 let imgOverlay=null;
 
+/* ==================================================
+   MAP BOUNDS
+================================================== */
 function bounds(){
   return L.latLngBounds(
-    map.unproject([0,IMG_H],map.getMaxZoom()),
-    map.unproject([IMG_W,0],map.getMaxZoom())
+    map.unproject([0, IMG_H], map.getMaxZoom()),
+    map.unproject([IMG_W, 0], map.getMaxZoom())
   );
 }
 
-/* Load Sector Image */
+/* ==================================================
+   LOAD SECTOR IMAGE
+================================================== */
 async function loadSector(sec){
   APP.currentSector = sec;
-  const img = APP.images[sec];
 
   if(imgOverlay) map.removeLayer(imgOverlay);
 
-  imgOverlay = L.imageOverlay(img, bounds()).addTo(map);
+  imgOverlay = L.imageOverlay(APP.images[sec], bounds());
+  map.addLayer(imgOverlay);
+
   map.setMaxBounds(bounds());
   map.fitBounds(bounds());
 
@@ -172,25 +218,32 @@ async function loadSector(sec){
   renderRectangles(sec);
 }
 
-/* Draw stored rectangles */
+/* ==================================================
+   RENDER RECTANGLES
+================================================== */
 function renderRectangles(sec){
   const grp = APP.drawingLayer[sec];
   grp.clearLayers();
 
   APP.data[sec].forEach(item=>{
     const r = L.rectangle(item.boundsLatLng,{
-      color:"#ff9800",weight:2,fillColor:"#ffd280",fillOpacity:0.35
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:0.35
     }).addTo(grp);
 
     r.bindTooltip(item.rangeText,{className:"my-tooltip"});
-    item._layer=r;
+    item._layer = r;
   });
 }
 
-/* Expand B-720-725 → ["B-720","B-721"...] */
-function expandRange(text){
-  text=text.replace(/\s+/g,"").toUpperCase();
-  const m=text.match(/^([A-Z])[-]?(\d+)(?:-(\d+))?$/);
+/* ==================================================
+   EXPAND RANGE (A-50-55 → A-50..A-55)
+================================================== */
+function expandRange(t){
+  t = t.replace(/\s+/g,"").toUpperCase();
+  const m = t.match(/^([A-Z])[-]?(\d+)(?:-(\d+))?$/);
   if(!m) return [];
 
   const L=m[1], a=Number(m[2]), b=m[3]?Number(m[3]):a;
@@ -200,25 +253,27 @@ function expandRange(text){
   return out;
 }
 
-/* Search Logic */
+/* ==================================================
+   SEARCH
+================================================== */
 document.getElementById("searchBtn").onclick=()=>{
   let v=document.getElementById("searchBox").value.trim().toUpperCase();
-  if(!v){alert("Enter A-57 or B-720");return;}
+  if(!v){alert("Enter block number.");return;}
 
   const m=v.match(/^([A-Z])[-]?(\d+)$/);
-  if(!m){alert("Invalid format");return;}
+  if(!m){alert("Invalid format. Use B-720 or A-57");return;}
 
   const key=`${m[1]}-${m[2]}`;
   let found=null;
 
-  [APP.currentSector,1,2].forEach(sec=>{
+  [APP.currentSector,1,2,3].forEach(sec=>{
     if(found) return;
-    APP.data[sec].forEach(it=>{
-      if(it.expanded.includes(key)) found={sec,block:it};
+    APP.data[sec].forEach(i=>{
+      if(i.expanded.includes(key)) found={sec,block:i};
     });
   });
 
-  if(!found){ alert("Not found");return; }
+  if(!found){alert("Block not found.");return;}
 
   if(found.sec!==APP.currentSector){
     document.querySelectorAll(".tab").forEach(t=>
@@ -230,57 +285,66 @@ document.getElementById("searchBtn").onclick=()=>{
   setTimeout(()=>{
     const r=found.block._layer;
     if(!r) return;
+
     map.fitBounds(r.getBounds().pad(0.35));
+
     r.setStyle({color:"#ffee00",weight:4,fillOpacity:0.6});
     setTimeout(()=>r.setStyle({color:"#ff9800",weight:2,fillOpacity:0.35}),3000);
   },600);
 };
 
-/* Sector Switching */
+/* ==================================================
+   SECTOR SWITCHING
+================================================== */
 document.querySelectorAll(".tab").forEach(t=>{
   t.onclick=()=>{
-    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".tab").forEach(a=>a.classList.remove("active"));
     t.classList.add("active");
     loadSector(Number(t.dataset.sector));
   };
 });
 
-/* Auto-load JSON from GitHub */
+/* ==================================================
+   AUTO LOAD JSON (GitHub)
+================================================== */
 fetch("./township_map_ranges.json")
-  .then(r=>r.json())
-  .then(js=>{ APP.data=js.sectors; console.log("JSON loaded"); })
-  .catch(()=>console.warn("JSON missing, starting empty"));
+ .then(r=>r.json())
+ .then(js=>APP.data = js.sectors)
+ .catch(()=>console.warn("No JSON file found. Using empty."));
 
 loadSector(1);
-</script>
 
-
-
-<!-- ============================================================
-     PART 3 — ADMIN TOOLS + AUTOSAVE + LOGIN
-============================================================ -->
-<script>
-/* Admin Password */
+/* ==================================================
+   ADMIN MODE & DRAWING
+================================================== */
 const ADMIN_PASSWORD="NALCO123";
 
-/* Admin Login */
 document.getElementById("adminLoginBtn").onclick=()=>{
   const pwd=prompt("Enter Admin Password:");
   if(pwd===ADMIN_PASSWORD){
     document.getElementById("adminPanel").style.display="block";
     alert("Admin Mode Enabled");
-  } else alert("Incorrect password");
+  } else alert("Wrong password");
 };
 
-/* Leaflet Draw Tools */
-const drawControl=new L.Control.Draw({
+const drawControl = new L.Control.Draw({
   draw:{
-    marker:false,circle:false,polyline:false,polygon:false,circlemarker:false,
-    rectangle:{shapeOptions:{color:"#ff9800",weight:2,fillColor:"#ffd280",fillOpacity:0.35}}
+    polygon:false,
+    circle:false,
+    polyline:false,
+    circlemarker:false,
+    marker:false,
+    rectangle:{
+      shapeOptions:{
+        color:"#ff9800",
+        weight:2,
+        fillColor:"#ffd280",
+        fillOpacity:0.35
+      }
+    }
   }
 });
 
-/* Toggle Drawing */
 document.getElementById("toggleEditor").onclick=()=>{
   APP.editor=!APP.editor;
   document.getElementById("toggleEditor").innerText=
@@ -290,37 +354,40 @@ document.getElementById("toggleEditor").onclick=()=>{
   else map.removeControl(drawControl);
 };
 
-/* AUTOSAVE + AUTOLOAD */
+/* ==================================================
+   AUTOSAVE
+================================================== */
 function autosave(){
   localStorage.setItem("township_autosave",JSON.stringify(APP.data));
 }
-function autoload(){
-  const s=localStorage.getItem("township_autosave");
-  if(s){ APP.data=JSON.parse(s); console.log("Autosaved data loaded"); }
-}
-autoload();
 
-/* Drawing New Rectangle */
-map.on(L.Draw.Event.CREATED,e=>{
+/* Load autosave if exists */
+let saved = localStorage.getItem("township_autosave");
+if(saved) APP.data = JSON.parse(saved);
+
+/* ==================================================
+   RECTANGLE CREATED
+================================================== */
+map.on(L.Draw.Event.CREATED, e=>{
   if(!APP.editor) return;
 
   const layer=e.layer;
-  const range=prompt("Enter block range (ex: B-529-540):");
+  const range=prompt("Enter block range (e.g., B-529-540):");
   if(!range) return;
 
   const exp=expandRange(range);
-  if(exp.length===0){ alert("Invalid range");return;}
+  if(exp.length===0){ alert("Invalid format.");return;}
 
   const b=layer.getBounds();
 
   const item={
-    id:"id_"+(++APP.counter),
-    sector:APP.currentSector,
-    rangeText:range.toUpperCase(),
-    expanded:exp,
-    boundsLatLng:[
-      [b.getSouth(),b.getWest()],
-      [b.getNorth(),b.getEast()]
+    id: "id_"+(++APP.counter),
+    sector: APP.currentSector,
+    rangeText: range.toUpperCase(),
+    expanded: exp,
+    boundsLatLng: [
+      [b.getSouth(), b.getWest()],
+      [b.getNorth(), b.getEast()]
     ]
   };
 
@@ -333,7 +400,9 @@ map.on(L.Draw.Event.CREATED,e=>{
   alert("Saved.");
 });
 
-/* DOWNLOAD JSON */
+/* ==================================================
+   JSON DOWNLOAD
+================================================== */
 document.getElementById("downloadJSON").onclick=()=>{
   const blob=new Blob(
     [JSON.stringify({sectors:APP.data},null,2)],
@@ -341,30 +410,35 @@ document.getElementById("downloadJSON").onclick=()=>{
   );
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
-  a.href=url;a.download="township_map_ranges.json";a.click();
+  a.href=url;
+  a.download="township_map_ranges.json";
+  a.click();
   URL.revokeObjectURL(url);
 };
 
-/* LOAD JSON MANUALLY */
+/* ==================================================
+   JSON UPLOAD
+================================================== */
 document.getElementById("loadJSON").onclick=()=>{
   document.getElementById("fileInput").click();
 };
-document.getElementById("fileInput").onchange=ev=>{
-  const file=ev.target.files[0];
+document.getElementById("fileInput").onchange=evt=>{
+  const file=evt.target.files[0];
   const r=new FileReader();
   r.onload=e=>{
-    const js=JSON.parse(e.target.result);
-    APP.data=js.sectors;
+    APP.data = JSON.parse(e.target.result).sectors;
     renderRectangles(APP.currentSector);
-    alert("JSON Loaded");
+    alert("JSON Loaded.");
   };
   r.readAsText(file);
 };
 
-/* VERIFY BLOCKS */
+/* ==================================================
+   VERIFY BLOCKS
+================================================== */
 document.getElementById("verifyBtn").onclick=()=>{
   let out="";
-  [1,2].forEach(sec=>{
+  [1,2,3].forEach(sec=>{
     let R=APP.data[sec].length,
         B=APP.data[sec].reduce((a,i)=>a+i.expanded.length,0);
     out+=`Sector ${sec}:\nRanges: ${R}\nBlocks: ${B}\n\n`;
@@ -372,10 +446,14 @@ document.getElementById("verifyBtn").onclick=()=>{
   alert(out);
 };
 
-/* MISSING BLOCK DETECTOR */
+/* ==================================================
+   MISSING BLOCK DETECTOR
+================================================== */
 document.getElementById("missingBtn").onclick=()=>{
   let txt="";
-  [1,2].forEach(sec=>{
+  [1,2,3].forEach(sec=>{
+    txt+=`Sector ${sec}:\n`;
+
     let all=[];
     APP.data[sec].forEach(i=>all.push(...i.expanded));
 
@@ -385,8 +463,6 @@ document.getElementById("missingBtn").onclick=()=>{
       if(!groups[L]) groups[L]=[];
       groups[L].push(Number(n));
     });
-
-    txt+=`Sector ${sec}:\n`;
 
     Object.keys(groups).forEach(L=>{
       const nums=groups[L].sort((a,b)=>a-b);
