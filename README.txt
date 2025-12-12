@@ -1,0 +1,1 @@
+Upload all files to Squarespace and embed township-map.html via iframe.
