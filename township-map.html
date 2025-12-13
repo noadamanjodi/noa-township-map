@@ -303,8 +303,10 @@ async function loadSector(sec) {
 // RENDER SAVED RECTANGLES
 // ================================
 function renderRectangles(sec){
+  if (!APP.drawingLayer[sec]) return;
   const grp = APP.drawingLayer[sec];
   grp.clearLayers();
+  APP.layerIndex = {};
 
   APP.data[sec].forEach(item => {
     const rect = L.rectangle(item.boundsLatLng, {
@@ -314,8 +316,10 @@ function renderRectangles(sec){
       fillOpacity:0.35
     }).addTo(grp);
 
-    rect.bindTooltip(item.rangeText, {className:"my-tip"});
-    item._layer = rect;
+    rect.bindTooltip(item.rangeText, { className:"my-tip" });
+
+    // SAFE reference (not saved in JSON)
+    APP.layerIndex[item.id] = rect;
   });
 }
 
@@ -372,7 +376,7 @@ document.getElementById("searchBtn").onclick = ()=>{
   }
 
   setTimeout(()=>{
-    const layer = found.block._layer;
+    const layer = APP.layerIndex[found.block.id];
     if (!layer) return;
 
     map.fitBounds(layer.getBounds().pad(0.3));
@@ -397,7 +401,7 @@ document.querySelectorAll(".tab").forEach(tab=>{
 
 // INITIAL LOAD
 loadSector(1);
-loadJSONfromGitHub();
+setTimeout(loadJSONfromGitHub, 400);
 </script>
 <!-- ================================
      PART 3 — ADMIN, DRAWING, JSON SAVE
