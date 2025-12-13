@@ -542,18 +542,29 @@ function expandRange(str) {
 // DOWNLOAD JSON
 // ================================
 document.getElementById("downloadJSON").onclick = () => {
-  const blob = new Blob(
-    [JSON.stringify({ sectors: APP.data }, null, 2)],
-    { type: "application/json" }
-  );
 
-  const url = URL.createObjectURL(blob);
+  if (!APP.data || Object.keys(APP.data).length === 0) {
+    alert("No data to download.");
+    return;
+  }
+
+  const jsonText = JSON.stringify({ sectors: APP.data }, null, 2);
+
+  const blob = new Blob([jsonText], { type: "application/json;charset=utf-8;" });
+
   const a = document.createElement("a");
-  a.href = url;
+  a.href = URL.createObjectURL(blob);
   a.download = "township_map_ranges.json";
+
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+
+  URL.revokeObjectURL(a.href);
+
+  alert("JSON downloaded.");
 };
+
 
 // ================================
 // LOAD JSON FILE FROM USER
@@ -586,67 +597,69 @@ loadJSONfromGitHub();
 
 // ================================
 // SAVE JSON TO GITHUB (AUTO-SAVE)
-// ================================
 document.getElementById("saveToGithub").onclick = async () => {
-  if (!APP.adminUnlocked) return alert("Admin login required.");
+  if (!APP.adminUnlocked) {
+    alert("Admin login required.");
+    return;
+  }
 
   let token = localStorage.getItem("GITHUB_TOKEN");
   if (!token) {
     token = prompt("Enter GitHub Personal Access Token:");
-    if (!token) return alert("Token required!");
+    if (!token) return;
     localStorage.setItem("GITHUB_TOKEN", token);
   }
 
-  const repoOwner = "noadamanjodi";
-  const repoName  = "noa-township-map";
-  const filePath  = "township_map_ranges.json";
+  const owner = "noadamanjodi";
+  const repo  = "noa-township-map";
+  const path  = "township_map_ranges.json";
 
-  const apiURL = `https://api.github.com/repos/${repoOwner}/${repoName}/contents/${filePath}`;
+  const apiURL = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
 
-  // Encode JSON → Base64
-  const content = btoa(unescape(encodeURIComponent(
-    JSON.stringify({ sectors: APP.data }, null, 2)
-  )));
+  const jsonContent = JSON.stringify({ sectors: APP.data }, null, 2);
+  const encoded = btoa(unescape(encodeURIComponent(jsonContent)));
 
- // Get existing file SHA (AUTHENTICATED)
-let sha = null;
-try {
-  const existing = await fetch(apiURL, {
+  let sha = null;
+
+  // 🔐 AUTHENTICATED SHA FETCH
+  const shaRes = await fetch(apiURL, {
     headers: {
-      "Authorization": "Bearer " + token
+      "Authorization": "Bearer " + token,
+      "Accept": "application/vnd.github+json"
     }
   });
 
-  if (existing.ok) {
-    const ex = await existing.json();
-    sha = ex.sha;
+  if (shaRes.ok) {
+    const shaJson = await shaRes.json();
+    sha = shaJson.sha;
   }
-} catch (e) {
-  console.warn("SHA fetch failed", e);
-}
 
-
-  const body = {
-    message: "Auto-update JSON from Township Map",
-    content,
-    sha
+  const payload = {
+    message: "Auto-update township map JSON",
+    content: encoded,
+    sha: sha
   };
 
-  const res = await fetch(apiURL, {
+  const saveRes = await fetch(apiURL, {
     method: "PUT",
     headers: {
       "Authorization": "Bearer " + token,
+      "Accept": "application/vnd.github+json",
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(payload)
   });
 
-  if (res.status === 200 || res.status === 201) {
-    alert("Saved to GitHub successfully!");
+  const result = await saveRes.json();
+  console.log("GitHub response:", result);
+
+  if (saveRes.ok) {
+    alert("✅ Saved to GitHub successfully!");
   } else {
-    alert("GitHub Save Failed. Check token.");
+    alert("❌ GitHub save failed:\n" + (result.message || "Unknown error"));
   }
 };
+
 
 // ================================
 // VERIFY BLOCKS → Missing Detector
