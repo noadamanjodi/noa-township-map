@@ -608,13 +608,23 @@ document.getElementById("saveToGithub").onclick = async () => {
     JSON.stringify({ sectors: APP.data }, null, 2)
   )));
 
-  // Get existing file SHA
-  let sha = null;
-  try {
-    const existing = await fetch(apiURL);
+ // Get existing file SHA (AUTHENTICATED)
+let sha = null;
+try {
+  const existing = await fetch(apiURL, {
+    headers: {
+      "Authorization": "Bearer " + token
+    }
+  });
+
+  if (existing.ok) {
     const ex = await existing.json();
     sha = ex.sha;
-  } catch (e) {}
+  }
+} catch (e) {
+  console.warn("SHA fetch failed", e);
+}
+
 
   const body = {
     message: "Auto-update JSON from Township Map",
