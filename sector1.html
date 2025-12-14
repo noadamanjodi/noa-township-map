@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sector 1 – Township Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+
+<style>
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Segoe UI, Arial;
+  background:#f5f7fb;
+}
+
+header{
+  background:#003f88;
+  color:white;
+  padding:12px 18px;
+  font-size:18px;
+  font-weight:600;
+}
+
+.app{
+  height:calc(100% - 48px);
+  display:flex;
+}
+
+.sidebar{
+  width:300px;
+  background:white;
+  padding:14px;
+  box-shadow:2px 0 12px rgba(0,0,0,0.12);
+}
+
+.panel{
+  background:white;
+  padding:12px;
+  border-radius:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  margin-bottom:14px;
+}
+
+input,button{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #cfd9e6;
+  margin-top:8px;
+  font-size:14px;
+}
+
+button{
+  background:#ffd24d;
+  font-weight:700;
+  cursor:pointer;
+}
+
+#map{
+  flex:1;
+  background:#ddd;
+}
+
+/* Tooltip */
+.leaflet-tooltip.my-tip{
+  background:rgba(0,0,0,0.75);
+  color:white;
+  border-radius:4px;
+  padding:4px 8px;
+}
+</style>
+</head>
+
+<body>
+
+<header>Sector 1 – Township Map</header>
+
+<div class="app">
+
+  <!-- LEFT -->
+  <div class="sidebar">
+
+    <div class="panel">
+      <label>Search Block (B-529 / C-12)</label>
+      <input id="searchInput" placeholder="Enter block">
+      <button id="searchBtn">Find Block</button>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/* ==========================
+   CONFIG – SECTOR 1 ONLY
+========================== */
+const IMG_W = 4400;
+const IMG_H = 3080;
+
+const IMAGE_URL = "./sector1.png";
+const JSON_URL  = "./sector1.json";
+
+let DATA = [];
+let layerIndex = {};
+
+const map = L.map("map", {
+  crs: L.CRS.Simple,
+  minZoom:-4,
+  maxZoom:4
+});
+
+/* IMAGE BOUNDS */
+function imageBounds(){
+  const sw = map.unproject([0, IMG_H], map.getMaxZoom());
+  const ne = map.unproject([IMG_W, 0], map.getMaxZoom());
+  return L.latLngBounds(sw, ne);
+}
+
+/* LOAD IMAGE */
+const bounds = imageBounds();
+L.imageOverlay(IMAGE_URL, bounds).addTo(map);
+map.fitBounds(bounds);
+map.setMaxBounds(bounds);
+
+/* LAYER GROUP */
+const group = L.featureGroup().addTo(map);
+
+/* LOAD JSON */
+fetch(JSON_URL + "?t=" + Date.now())
+.then(r=>r.json())
+.then(j=>{
+  DATA = j.sectors["1"] || [];
+  render();
+});
+
+/* RENDER BLOCKS */
+function render(){
+  group.clearLayers();
+  layerIndex = {};
+
+  DATA.forEach(item=>{
+    const rect = L.rectangle(item.boundsLatLng,{
+      color:"#ff9800",
+      weight:2,
+      fillOpacity:0.35
+    }).addTo(group);
+
+    rect.bindTooltip(item.rangeText,{className:"my-tip"});
+    layerIndex[item.id] = rect;
+  });
+}
+
+/* SEARCH */
+document.getElementById("searchBtn").onclick = ()=>{
+  const raw = document.getElementById("searchInput").value
+    .trim().toUpperCase();
+
+  if(!raw) return alert("Enter block");
+
+  let found = null;
+
+  DATA.forEach(b=>{
+    if(b.expanded.includes(raw)) found = b;
+  });
+
+  if(!found) return alert("Block not found in Sector 1");
+
+  const layer = layerIndex[found.id];
+  map.fitBounds(layer.getBounds().pad(0.35));
+  layer.setStyle({color:"#ff0",weight:4});
+
+  setTimeout(()=>{
+    layer.setStyle({color:"#ff9800",weight:2});
+  },2500);
+};
+</script>
+
+</body>
+</html>
