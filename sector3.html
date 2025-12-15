@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sector-3 Township Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
+
+<style>
+html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
+.app{height:100%;display:flex;flex-direction:column}
+header{background:#003f88;color:#fff;padding:12px 16px;font-size:18px;font-weight:600}
+.content{flex:1;display:flex;min-height:0}
+.sidebar{width:320px;background:#fff;padding:14px;overflow:auto;box-shadow:2px 0 12px rgba(0,0,0,.1)}
+.panel{margin-bottom:14px}
+input,button{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;margin-top:6px}
+button{cursor:pointer;font-weight:600}
+.find{background:#ffd24d;border:none}
+.unlock{background:#b6e57a;border:none}
+.save{background:#9fd0ff;border:none}
+.map-wrap{flex:1}
+#map{width:100%;height:100%}
+.leaflet-image-layer{pointer-events:none}
+</style>
+</head>
+
+<body>
+<div class="app">
+<header>Sector-3 Township Map</header>
+
+<div class="content">
+  <aside class="sidebar">
+
+    <div class="panel">
+      <label>Search Block</label>
+      <input id="searchInput" placeholder="Enter block (example: C-12)">
+      <button class="find" id="searchBtn">Find</button>
+    </div>
+
+    <div class="panel">
+      <button id="adminBtn">Admin Login</button>
+      <input id="adminPass" type="password" placeholder="Password">
+      <button class="unlock" id="unlockBtn">Unlock</button>
+    </div>
+
+    <div class="panel" id="adminTools" style="display:none">
+      <button id="toggleDraw">Enable Drawing</button>
+      <button id="downloadJson">Download JSON</button>
+      <button class="save" id="saveGithub">Save to GitHub</button>
+    </div>
+
+  </aside>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+  </div>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+<script>
+/* ================= CONFIG ================= */
+const IMG_W = 4400;
+const IMG_H = 3080;
+const IMAGE_URL = "./sector3.png";
+const JSON_URL  = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector3_ranges.json";
+
+/* ================= STATE ================= */
+let admin = false;
+let editor = false;
+let data = [];
+let layers = {};
+let counter = 0;
+
+/* ================= MAP ================= */
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds = [
+  map.unproject([0,IMG_H],0),
+  map.unproject([IMG_W,0],0)
+];
+L.imageOverlay(IMAGE_URL,bounds).addTo(map);
+map.fitBounds(bounds);
+
+const group = L.featureGroup().addTo(map);
+
+/* ================= LOAD JSON ================= */
+fetch(JSON_URL+"?t="+Date.now())
+.then(r=>r.ok?r.json():{sectors:{3:[]}})
+.then(j=>{
+  data = j.sectors?.[3] || [];
+  render();
+});
+
+/* ================= RENDER ================= */
+function render(){
+  group.clearLayers();
+  layers = {};
+  data.forEach(b=>{
+    const r = L.rectangle(b.boundsLatLng,{
+      color:"#ff9800",weight:2,fillOpacity:.35
+    }).addTo(group);
+    r.bindTooltip(b.rangeText);
+    layers[b.id]=r;
+  });
+}
+
+/* ================= SEARCH ================= */
+searchBtn.onclick=()=>{
+  const v = searchInput.value.trim().toUpperCase();
+  const f = data.find(d=>d.expanded.includes(v));
+  if(!f) return alert("Block not found in Sector-3");
+  const l = layers[f.id];
+  map.fitBounds(l.getBounds().pad(.4));
+};
+
+/* ================= ADMIN ================= */
+unlockBtn.onclick=()=>{
+  if(adminPass.value==="NALCO123"){
+    admin=true;
+    adminTools.style.display="block";
+    alert("Admin unlocked");
+  }else alert("Wrong password");
+};
+
+/* ================= DRAW ================= */
+const draw = new L.Control.Draw({
+  draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
+});
+
+toggleDraw.onclick=()=>{
+  if(!admin) return alert("Admin only");
+  editor=!editor;
+  toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
+  editor?map.addControl(draw):map.removeControl(draw);
+};
+
+map.on(L.Draw.Event.CREATED,e=>{
+  if(!editor) return;
+  const range = prompt("Enter range (Example: C-12-20)");
+  if(!range) return;
+
+  const exp = expand(range);
+  if(!exp.length) return alert("Invalid range");
+
+  const b = e.layer.getBounds();
+  data.push({
+    id:"id_"+(++counter),
+    sector:3,
+    rangeText:range.toUpperCase(),
+    expanded:exp,
+    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
+  });
+  render();
+});
+
+/* ================= DOWNLOAD ================= */
+downloadJson.onclick=()=>{
+  const blob=new Blob([JSON.stringify({sectors:{3:data}},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="sector3_ranges.json";
+  a.click();
+};
+
+/* ================= SAVE TO GITHUB ================= */
+saveGithub.onclick=async()=>{
+  if(!admin) return;
+
+  let token = localStorage.getItem("GITHUB_TOKEN");
+  if(!token){
+    token = prompt("Enter GitHub Token");
+    if(!token) return;
+    localStorage.setItem("GITHUB_TOKEN",token);
+  }
+
+  const clean = data.map(x=>({
+    id:x.id,sector:3,rangeText:x.rangeText,expanded:x.expanded,boundsLatLng:x.boundsLatLng
+  }));
+
+  const body = {
+    message:"Update sector-3 map",
+    content:btoa(JSON.stringify({sectors:{3:clean}},null,2))
+  };
+
+  const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector3_ranges.json";
+  const r = await fetch(api,{headers:{Authorization:"Bearer "+token}});
+  if(r.ok){body.sha=(await r.json()).sha}
+
+  const res = await fetch(api,{
+    method:"PUT",
+    headers:{
+      Authorization:"Bearer "+token,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify(body)
+  });
+
+  res.ok?alert("✅ Sector-3 Saved"):alert("❌ Save failed");
+};
+
+/* ================= UTIL ================= */
+function expand(s){
+  s=s.replace(/\s/g,"").toUpperCase();
+  const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
+  if(!m)return[];
+  const a=+m[2],b=+m[3]||a;
+  const o=[];
+  for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
+  return o;
+}
+</script>
+</body>
+</html>
