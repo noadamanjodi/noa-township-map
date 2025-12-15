@@ -6,20 +6,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
 <style>
-html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
-.app{height:100%;display:flex;flex-direction:column}
-header{background:#003f88;color:#fff;padding:12px 16px;font-size:18px;font-weight:600}
-.content{flex:1;display:flex;min-height:0}
-.sidebar{width:320px;background:#fff;padding:14px;overflow:auto;box-shadow:2px 0 12px rgba(0,0,0,.1)}
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:#f4f6fb
+}
+.app{
+  height:100%;
+  display:flex;
+  flex-direction:column
+}
+header{
+  background:#003f88;
+  color:#fff;
+  padding:12px 16px;
+  font-size:18px;
+  font-weight:600
+}
+.content{
+  flex:1;
+  display:flex;
+  min-height:0
+}
+.sidebar{
+  width:320px;
+  background:#fff;
+  padding:14px;
+  box-shadow:2px 0 12px rgba(0,0,0,.1)
+}
 .panel{margin-bottom:14px}
-input,button{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;margin-top:6px}
-button{cursor:pointer;font-weight:600}
-.find{background:#ffd24d;border:none}
-.unlock{background:#b6e57a;border:none}
-.save{background:#9fd0ff;border:none}
+input,button{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  margin-top:6px
+}
+button{
+  cursor:pointer;
+  font-weight:600;
+  background:#ffd24d;
+  border:none
+}
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
@@ -31,36 +62,25 @@ button{cursor:pointer;font-weight:600}
 <header>Sector-1 Township Map</header>
 
 <div class="content">
+
+  <!-- SEARCH ONLY SIDEBAR -->
   <aside class="sidebar">
-
     <div class="panel">
-      <label>Search Block (B-529)</label>
+      <label><strong>Search Block</strong> (Example: B-529)</label>
       <input id="searchInput" placeholder="Enter block">
-      <button class="find" id="searchBtn">Find</button>
+      <button id="searchBtn">Find Block</button>
     </div>
-
-    <div class="panel">
-      <button id="adminBtn">Admin Login</button>
-      <input id="adminPass" type="password" placeholder="Password">
-      <button class="unlock" id="unlockBtn">Unlock</button>
-    </div>
-
-    <div class="panel" id="adminTools" style="display:none">
-      <button id="toggleDraw">Enable Drawing</button>
-      <button id="downloadJson">Download JSON</button>
-      <button class="save" id="saveGithub">Save to GitHub</button>
-    </div>
-
   </aside>
 
+  <!-- MAP -->
   <div class="map-wrap">
     <div id="map"></div>
   </div>
+
 </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
 /* ================= CONFIG ================= */
@@ -68,13 +88,6 @@ const IMG_W = 4400;
 const IMG_H = 3080;
 const IMAGE_URL = "./sector1.png";
 const JSON_URL  = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
-
-/* ================= STATE ================= */
-let admin = false;
-let editor = false;
-let data = [];
-let layers = {};
-let counter = 0;
 
 /* ================= MAP ================= */
 const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
@@ -85,124 +98,75 @@ const bounds = [
 L.imageOverlay(IMAGE_URL,bounds).addTo(map);
 map.fitBounds(bounds);
 
+/* ================= DATA ================= */
+let data = [];
+let layers = {};
+let lastHighlighted = null;
+
 const group = L.featureGroup().addTo(map);
 
 /* ================= LOAD JSON ================= */
-fetch(JSON_URL+"?t="+Date.now())
-.then(r=>r.ok?r.json():{sectors:{1:[]}})
-.then(j=>{
-  data = j.sectors?.[1] || [];
-  render();
-});
+fetch(JSON_URL + "?t=" + Date.now())
+  .then(r => r.json())
+  .then(j => {
+    data = j.sectors?.[1] || [];
+    renderBlocks();
+  });
 
-/* ================= RENDER ================= */
-function render(){
+/* ================= RENDER BLOCKS ================= */
+function renderBlocks(){
   group.clearLayers();
   layers = {};
+
   data.forEach(b=>{
-    const r = L.rectangle(b.boundsLatLng,{
-      color:"#ff9800",weight:2,fillOpacity:.35
+    const rect = L.rectangle(b.boundsLatLng,{
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:0.35
     }).addTo(group);
-    r.bindTooltip(b.rangeText);
-    layers[b.id]=r;
+
+    rect.bindTooltip(b.rangeText);
+    layers[b.id] = rect;
   });
 }
 
 /* ================= SEARCH ================= */
-document.getElementById("searchBtn").onclick=()=>{
+document.getElementById("searchBtn").onclick = ()=>{
   const v = searchInput.value.trim().toUpperCase();
-  const f = data.find(d=>d.expanded.includes(v));
-  if(!f) return alert("Block not found");
-  const l = layers[f.id];
-  map.fitBounds(l.getBounds().pad(.4));
-};
+  if(!v) return;
 
-/* ================= ADMIN ================= */
-unlockBtn.onclick=()=>{
-  if(adminPass.value==="NALCO123"){
-    admin=true;
-    adminTools.style.display="block";
-    alert("Admin unlocked");
-  }else alert("Wrong password");
-};
-
-/* ================= DRAW ================= */
-const draw = new L.Control.Draw({
-  draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
-});
-
-toggleDraw.onclick=()=>{
-  if(!admin) return alert("Admin only");
-  editor=!editor;
-  toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
-  editor?map.addControl(draw):map.removeControl(draw);
-};
-
-map.on(L.Draw.Event.CREATED,e=>{
-  if(!editor) return;
-  const range = prompt("Enter range (B-529-540)");
-  if(!range) return;
-
-  const exp = expand(range);
-  if(!exp.length) return alert("Invalid range");
-
-  const b = e.layer.getBounds();
-  data.push({
-    id:"id_"+(++counter),
-    sector:1,
-    rangeText:range.toUpperCase(),
-    expanded:exp,
-    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
-  });
-  render();
-});
-
-/* ================= SAVE JSON ================= */
-saveGithub.onclick=async()=>{
-  if(!admin) return;
-
-  let token = localStorage.getItem("GITHUB_TOKEN");
-  if(!token){
-    token = prompt("Enter GitHub Token");
-    if(!token) return;
-    localStorage.setItem("GITHUB_TOKEN",token);
+  const found = data.find(d => d.expanded.includes(v));
+  if(!found){
+    alert("Block not found in Sector-1");
+    return;
   }
 
-  const clean = data.map(x=>({
-    id:x.id,sector:1,rangeText:x.rangeText,expanded:x.expanded,boundsLatLng:x.boundsLatLng
-  }));
+  /* Reset previous highlight */
+  if(lastHighlighted){
+    lastHighlighted.setStyle({
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:0.35
+    });
+  }
 
-  const body = {
-    message:"Update sector-1 map",
-    content:btoa(JSON.stringify({sectors:{1:clean}},null,2))
-  };
+  const layer = layers[found.id];
 
-  const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector1_ranges.json";
-  const r = await fetch(api,{headers:{Authorization:"Bearer "+token}});
-  if(r.ok){body.sha=(await r.json()).sha}
-
-  const res = await fetch(api,{
-    method:"PUT",
-    headers:{
-      Authorization:"Bearer "+token,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify(body)
+  /* Highlight searched block */
+  layer.setStyle({
+    color:"#2e7d32",
+    weight:4,
+    fillColor:"#66bb6a",
+    fillOpacity:0.55
   });
 
-  res.ok?alert("✅ Saved to GitHub"):alert("❌ Save failed");
-};
+  lastHighlighted = layer;
 
-/* ================= UTIL ================= */
-function expand(s){
-  s=s.replace(/\s/g,"").toUpperCase();
-  const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
-  if(!m)return[];
-  const a=+m[2],b=+m[3]||a;
-  const o=[];
-  for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
-  return o;
-}
+  map.fitBounds(layer.getBounds().pad(0.35));
+};
 </script>
+
 </body>
 </html>
