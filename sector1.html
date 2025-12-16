@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Sector-1 Township Map</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Sector-1 Township Map with Sarasawti Vihar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
@@ -24,32 +24,26 @@ header{
   color:#fff;
   padding:12px 16px;
   font-size:18px;
-  font-weight:600;
-  text-align:center
+  font-weight:600
 }
 .content{
   flex:1;
   display:flex;
   min-height:0
 }
-
-/* ===== SIDEBAR ===== */
 .sidebar{
   width:320px;
   background:#fff;
   padding:14px;
-  box-shadow:2px 0 12px rgba(0,0,0,.1);
-  z-index:1000
+  box-shadow:2px 0 12px rgba(0,0,0,.1)
 }
 .panel{margin-bottom:14px}
-label{font-size:14px}
 input,button{
   width:100%;
-  padding:12px;
-  border-radius:10px;
+  padding:10px;
+  border-radius:8px;
   border:1px solid #ccc;
-  margin-top:8px;
-  font-size:15px
+  margin-top:6px
 }
 button{
   cursor:pointer;
@@ -57,46 +51,24 @@ button{
   background:#ffd24d;
   border:none
 }
-button.clear{
-  background:#e0e7ff;
-  color:#003f88
-}
-
-/* ===== MAP ===== */
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
-
-/* ===== MOBILE OPTIMIZATION ===== */
-@media(max-width:768px){
-  .content{
-    flex-direction:column
-  }
-  .sidebar{
-    width:100%;
-    box-shadow:0 2px 10px rgba(0,0,0,.15)
-  }
-  header{
-    font-size:16px
-  }
-}
 </style>
 </head>
 
 <body>
 <div class="app">
-
-<header>Sector-1 with Sector-2 Saraswati Vihar Township Map</header>
+<header>Sector-1 Township Map with Sarasawti Vihar</header>
 
 <div class="content">
 
-  <!-- SEARCH PANEL -->
+  <!-- SEARCH ONLY SIDEBAR -->
   <aside class="sidebar">
     <div class="panel">
       <label><strong>Search Block</strong> (Example: B-529)</label>
       <input id="searchInput" placeholder="Enter block">
-      <button id="searchBtn">🔍 Find Block</button>
-      <button class="clear" id="clearBtn">❌ Clear Highlight</button>
+      <button id="searchBtn">Find Block</button>
     </div>
   </aside>
 
@@ -118,13 +90,7 @@ const IMAGE_URL = "./sector1.png";
 const JSON_URL  = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
 
 /* ================= MAP ================= */
-const map = L.map("map",{
-  crs:L.CRS.Simple,
-  minZoom:-4,
-  zoomControl:true,
-  tap:true
-});
-
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
 const bounds = [
   map.unproject([0,IMG_H],0),
   map.unproject([IMG_W,0],0)
@@ -147,7 +113,7 @@ fetch(JSON_URL + "?t=" + Date.now())
     renderBlocks();
   });
 
-/* ================= RENDER ================= */
+/* ================= RENDER BLOCKS ================= */
 function renderBlocks(){
   group.clearLayers();
   layers = {};
@@ -160,13 +126,13 @@ function renderBlocks(){
       fillOpacity:0.35
     }).addTo(group);
 
-    rect.bindTooltip(b.rangeText,{sticky:true});
+    rect.bindTooltip(b.rangeText);
     layers[b.id] = rect;
   });
 }
 
 /* ================= SEARCH ================= */
-searchBtn.onclick = ()=>{
+document.getElementById("searchBtn").onclick = ()=>{
   const v = searchInput.value.trim().toUpperCase();
   if(!v) return;
 
@@ -176,9 +142,19 @@ searchBtn.onclick = ()=>{
     return;
   }
 
-  clearHighlight();
+  /* Reset previous highlight */
+  if(lastHighlighted){
+    lastHighlighted.setStyle({
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:0.35
+    });
+  }
 
   const layer = layers[found.id];
+
+  /* Highlight searched block */
   layer.setStyle({
     color:"#2e7d32",
     weight:4,
@@ -187,24 +163,9 @@ searchBtn.onclick = ()=>{
   });
 
   lastHighlighted = layer;
+
   map.fitBounds(layer.getBounds().pad(0.35));
 };
-
-/* ================= CLEAR ================= */
-clearBtn.onclick = clearHighlight;
-
-function clearHighlight(){
-  if(lastHighlighted){
-    lastHighlighted.setStyle({
-      color:"#ff9800",
-      weight:2,
-      fillColor:"#ffd280",
-      fillOpacity:0.35
-    });
-    lastHighlighted = null;
-    map.fitBounds(bounds);
-  }
-}
 </script>
 
 </body>
