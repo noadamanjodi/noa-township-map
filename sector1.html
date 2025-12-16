@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Sector-1 & Sector-2  (Only Saraswati Vihar)  Map</title>
+<title>Township Sector-1 & Sector-2 (Only Saraswati Vihar) Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -12,12 +12,12 @@ html,body{
   height:100%;
   margin:0;
   font-family:Segoe UI,Arial;
-  background:#f4f6fb
+  background:#f4f6fb;
 }
 .app{
   height:100%;
   display:flex;
-  flex-direction:column
+  flex-direction:column;
 }
 header{
   background:#003f88;
@@ -25,12 +25,12 @@ header{
   padding:12px 16px;
   font-size:18px;
   font-weight:600;
-  text-align:center
+  text-align:center;
 }
 .content{
   flex:1;
   display:flex;
-  min-height:0
+  min-height:0;
 }
 
 /* ===== SIDEBAR ===== */
@@ -39,7 +39,7 @@ header{
   background:#fff;
   padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.1);
-  z-index:1000
+  z-index:1000;
 }
 .panel{margin-bottom:14px}
 label{font-size:14px}
@@ -49,17 +49,29 @@ input,button{
   border-radius:10px;
   border:1px solid #ccc;
   margin-top:8px;
-  font-size:15px
+  font-size:15px;
 }
 button{
   cursor:pointer;
   font-weight:600;
   background:#ffd24d;
-  border:none
+  border:none;
 }
 button.clear{
   background:#e0e7ff;
-  color:#003f88
+  color:#003f88;
+}
+
+/* MESSAGE BOX */
+#msgBox{
+  display:none;
+  margin-top:10px;
+  padding:10px;
+  border-radius:8px;
+  font-size:14px;
+  background:#ffe4e4;
+  color:#b00020;
+  font-weight:600;
 }
 
 /* ===== MAP ===== */
@@ -67,18 +79,14 @@ button.clear{
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
 
-/* ===== MOBILE OPTIMIZATION ===== */
+/* ===== MOBILE ===== */
 @media(max-width:768px){
-  .content{
-    flex-direction:column
-  }
+  .content{flex-direction:column}
   .sidebar{
     width:100%;
-    box-shadow:0 2px 10px rgba(0,0,0,.15)
+    box-shadow:0 2px 10px rgba(0,0,0,.15);
   }
-  header{
-    font-size:16px
-  }
+  header{font-size:16px}
 }
 </style>
 </head>
@@ -86,7 +94,7 @@ button.clear{
 <body>
 <div class="app">
 
-<header>Township Sector-1 & Sector-2  (Only Saraswati Vihar)  Map</header>
+<header>Township Sector-1 & Sector-2 (Only Saraswati Vihar) Map</header>
 
 <div class="content">
 
@@ -97,6 +105,7 @@ button.clear{
       <input id="searchInput" placeholder="Enter block">
       <button id="searchBtn">🔍 Find Block</button>
       <button class="clear" id="clearBtn">❌ Clear Highlight</button>
+      <div id="msgBox"></div>
     </div>
   </aside>
 
@@ -129,6 +138,7 @@ const bounds = [
   map.unproject([0,IMG_H],0),
   map.unproject([IMG_W,0],0)
 ];
+
 L.imageOverlay(IMAGE_URL,bounds).addTo(map);
 map.fitBounds(bounds);
 
@@ -138,6 +148,17 @@ let layers = {};
 let lastHighlighted = null;
 
 const group = L.featureGroup().addTo(map);
+
+/* ================= MESSAGE ================= */
+const msgBox = document.getElementById("msgBox");
+
+function showMessage(text){
+  msgBox.innerText = text;
+  msgBox.style.display = "block";
+}
+function clearMessage(){
+  msgBox.style.display = "none";
+}
 
 /* ================= LOAD JSON ================= */
 fetch(JSON_URL + "?t=" + Date.now())
@@ -172,11 +193,12 @@ searchBtn.onclick = ()=>{
 
   const found = data.find(d => d.expanded.includes(v));
   if(!found){
-    alert("Block not found in Sector-1 & Sector-2 (Only Saraswati Vihar)");
+    showMessage("Block not found in Sector-1 & Sector-2 (Only Saraswati Vihar)");
     return;
   }
 
-  clearHighlight();
+  clearMessage();
+  clearHighlight(false);
 
   const layer = layers[found.id];
   layer.setStyle({
@@ -191,9 +213,10 @@ searchBtn.onclick = ()=>{
 };
 
 /* ================= CLEAR ================= */
-clearBtn.onclick = clearHighlight;
+clearBtn.onclick = ()=>clearHighlight(true);
 
-function clearHighlight(){
+function clearHighlight(resetView){
+  clearMessage();
   if(lastHighlighted){
     lastHighlighted.setStyle({
       color:"#ff9800",
@@ -202,8 +225,8 @@ function clearHighlight(){
       fillOpacity:0.35
     });
     lastHighlighted = null;
-    map.fitBounds(bounds);
   }
+  if(resetView) map.fitBounds(bounds);
 }
 </script>
 
