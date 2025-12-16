@@ -13,41 +13,18 @@ html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
 .app{height:100%;display:flex;flex-direction:column}
 header{background:#003f88;color:#fff;padding:12px 16px;font-size:18px;font-weight:600;text-align:center}
 .content{flex:1;display:flex;min-height:0}
-
-/* SIDEBAR */
-.sidebar{
-  width:320px;
-  background:#fff;
-  padding:14px;
-  overflow:auto;
-  box-shadow:2px 0 12px rgba(0,0,0,.1)
-}
+.sidebar{width:320px;background:#fff;padding:14px;overflow:auto;box-shadow:2px 0 12px rgba(0,0,0,.1)}
 .panel{margin-bottom:14px}
-label{font-size:14px}
-input,button{
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid #ccc;
-  margin-top:8px;
-  font-size:15px
-}
+input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ccc;margin-top:8px;font-size:15px}
 button{cursor:pointer;font-weight:600;border:none}
 .find{background:#ffd24d}
 .clear{background:#e0e7ff;color:#003f88}
 .unlock{background:#b6e57a}
 .save{background:#9fd0ff}
-
-/* MAP */
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
-
-/* MOBILE */
-@media(max-width:768px){
-  .content{flex-direction:column}
-  .sidebar{width:100%}
-}
+@media(max-width:768px){.content{flex-direction:column}.sidebar{width:100%}}
 </style>
 </head>
 
@@ -56,37 +33,35 @@ button{cursor:pointer;font-weight:600;border:none}
 <header>Sector-2 Township Map</header>
 
 <div class="content">
-
 <aside class="sidebar">
 
-  <!-- SEARCH -->
-  <div class="panel">
-    <label><strong>Search Quarter</strong></label>
-    <input id="searchInput" placeholder="Example: 2-B-720">
-    <button class="find" id="searchBtn">🔍 Find</button>
-    <button class="clear" id="clearBtn">❌ Clear</button>
-  </div>
+<!-- SEARCH -->
+<div class="panel">
+<label><strong>Search Quarter</strong></label>
+<input id="searchInput" placeholder="Example: 1-B-720 or 2-B-720">
+<button class="find" id="searchBtn">🔍 Find</button>
+<button class="clear" id="clearBtn">❌ Clear</button>
+</div>
 
-  <!-- ADMIN -->
-  <div class="panel">
-    <button id="adminBtn">Admin Login</button>
-    <input id="adminPass" type="password" placeholder="Password">
-    <button class="unlock" id="unlockBtn">Unlock</button>
-  </div>
+<!-- ADMIN -->
+<div class="panel">
+<button id="adminBtn">Admin Login</button>
+<input id="adminPass" type="password" placeholder="Password">
+<button class="unlock" id="unlockBtn">Unlock</button>
+</div>
 
-  <!-- ADMIN TOOLS -->
-  <div class="panel" id="adminTools" style="display:none">
-    <button id="toggleDraw">Enable Drawing</button>
-    <button id="downloadJson">Download JSON</button>
-    <button class="save" id="saveGithub">Save to GitHub</button>
-  </div>
+<!-- ADMIN TOOLS -->
+<div class="panel" id="adminTools" style="display:none">
+<button id="toggleDraw">Enable Drawing</button>
+<button id="downloadJson">Download JSON</button>
+<button class="save" id="saveGithub">Save to GitHub</button>
+</div>
 
 </aside>
 
 <div class="map-wrap">
-  <div id="map"></div>
+<div id="map"></div>
 </div>
-
 </div>
 </div>
 
@@ -103,8 +78,7 @@ const JSON_URL  = "https://raw.githubusercontent.com/noadamanjodi/noa-township-m
 
 /* ================= STATE ================= */
 let admin=false, editor=false;
-let data=[], layers={}, counter=0;
-let lastHighlighted=null;
+let data=[], layers={}, counter=0, lastHighlighted=null;
 
 /* ================= MAP ================= */
 const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
@@ -119,7 +93,7 @@ const group=L.featureGroup().addTo(map);
 
 /* ================= LOAD JSON ================= */
 fetch(JSON_URL+"?t="+Date.now())
-.then(r=>r.ok?r.json():{sectors:{2:[]}})
+.then(r=>r.json())
 .then(j=>{
   data=j.sectors?.[2]||[];
   counter=data.length;
@@ -132,33 +106,26 @@ function render(){
   layers={};
   data.forEach(b=>{
     const r=L.rectangle(b.boundsLatLng,{
-      color:"#ff9800",weight:2,fillColor:"#ffd280",fillOpacity:.35
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:.35
     }).addTo(group);
     r.bindTooltip(`Sector-2 : ${b.rangeText}`,{sticky:true});
     layers[b.id]=r;
   });
 }
 
-/* ================= SEARCH (UNIQUE) ================= */
+/* ================= SEARCH (MANDATORY PREFIX) ================= */
 searchBtn.onclick=()=>{
   const raw=searchInput.value.trim().toUpperCase();
-  if(!raw)return;
-
-  let sector=SECTOR;
-  let quarter=raw;
-
-  // Accept 2-B-720
   const m=raw.match(/^([12])-(.+)$/);
-  if(m){
-    sector=parseInt(m[1],10);
-    quarter=m[2];
-  }
-
-  if(sector!==SECTOR){
-    alert(`❌ This page is Sector-${SECTOR} only`);
+  if(!m){
+    alert("❌ Use format like 1-B-720 or 2-B-720");
     return;
   }
 
+  const quarter=m[2];
   const found=data.find(d=>d.expanded.includes(quarter));
   if(!found){
     alert(`❌ ${quarter} not found in Sector-2`);
@@ -166,7 +133,6 @@ searchBtn.onclick=()=>{
   }
 
   clearHighlight(false);
-
   const l=layers[found.id];
   l.setStyle({
     color:"#2e7d32",
@@ -184,11 +150,14 @@ clearBtn.onclick=()=>clearHighlight(true);
 function clearHighlight(reset){
   if(lastHighlighted){
     lastHighlighted.setStyle({
-      color:"#ff9800",weight:2,fillColor:"#ffd280",fillOpacity:.35
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:.35
     });
     lastHighlighted=null;
   }
-  if(reset)map.fitBounds(bounds);
+  if(reset) map.fitBounds(bounds);
 }
 
 /* ================= ADMIN ================= */
@@ -206,19 +175,19 @@ const draw=new L.Control.Draw({
 });
 
 toggleDraw.onclick=()=>{
-  if(!admin)return alert("Admin only");
+  if(!admin) return alert("Admin only");
   editor=!editor;
   toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
   editor?map.addControl(draw):map.removeControl(draw);
 };
 
 map.on(L.Draw.Event.CREATED,e=>{
-  if(!editor)return;
+  if(!editor) return;
   const range=prompt("Enter range (Example: B-720-735)");
-  if(!range)return;
+  if(!range) return;
 
   const exp=expand(range);
-  if(!exp.length)return alert("Invalid range");
+  if(!exp.length) return alert("Invalid range");
 
   const b=e.layer.getBounds();
   data.push({
@@ -242,12 +211,12 @@ downloadJson.onclick=()=>{
 
 /* ================= SAVE GITHUB ================= */
 saveGithub.onclick=async()=>{
-  if(!admin)return;
+  if(!admin) return;
 
   let token=localStorage.getItem("GITHUB_TOKEN");
   if(!token){
     token=prompt("Enter GitHub Token");
-    if(!token)return;
+    if(!token) return;
     localStorage.setItem("GITHUB_TOKEN",token);
   }
 
@@ -258,7 +227,7 @@ saveGithub.onclick=async()=>{
 
   const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector2_ranges.json";
   const r=await fetch(api,{headers:{Authorization:"Bearer "+token}});
-  if(r.ok)body.sha=(await r.json()).sha;
+  if(r.ok) body.sha=(await r.json()).sha;
 
   const res=await fetch(api,{
     method:"PUT",
@@ -266,17 +235,17 @@ saveGithub.onclick=async()=>{
     body:JSON.stringify(body)
   });
 
-  res.ok?alert("✅ Sector-2 Saved"):alert("❌ Save failed");
+  alert(res.ok?"✅ Sector-2 Saved":"❌ Save failed");
 };
 
 /* ================= UTIL ================= */
 function expand(s){
   s=s.replace(/\s/g,"").toUpperCase();
   const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
-  if(!m)return[];
-  const a=+m[2],b=+m[3]||a;
+  if(!m) return [];
+  const a=+m[2], b=+m[3]||a;
   const o=[];
-  for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
+  for(let i=Math.min(a,b);i<=Math.max(a,b);i++) o.push(`${m[1]}-${i}`);
   return o;
 }
 </script>
