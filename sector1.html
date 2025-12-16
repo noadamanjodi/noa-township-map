@@ -37,7 +37,7 @@ button{cursor:pointer;font-weight:600;border:none}
 
 <div class="panel">
 <label><strong>Search Quarter</strong></label>
-<input id="searchInput" placeholder="Example: 1-B-720 or 2-B-720">
+<input id="searchInput" placeholder="Example: 1-B-168 or 2-B-168">
 <button class="find" id="searchBtn">🔍 Find</button>
 <button class="clear" id="clearBtn">❌ Clear</button>
 </div>
@@ -64,91 +64,184 @@ button{cursor:pointer;font-weight:600;border:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-const SECTOR=1;
-const IMG_W=4400, IMG_H=3080;
-const IMAGE_URL="./sector1.png";
-const JSON_URL="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
+/* ================= CONFIG ================= */
+const PAGE_SECTOR = 1;
+const IMG_W = 4400;
+const IMG_H = 3080;
+const IMAGE_URL = "./sector1.png";
+const JSON_URL  = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
 
+/* ================= STATE ================= */
 let admin=false, editor=false;
 let data=[], layers={}, counter=0, lastHighlighted=null;
 
+/* ================= MAP ================= */
 const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const bounds=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
+const bounds=[
+  map.unproject([0,IMG_H],0),
+  map.unproject([IMG_W,0],0)
+];
 L.imageOverlay(IMAGE_URL,bounds).addTo(map);
 map.fitBounds(bounds);
 
 const group=L.featureGroup().addTo(map);
 
+/* ================= LOAD JSON ================= */
 fetch(JSON_URL+"?t="+Date.now())
 .then(r=>r.json())
-.then(j=>{data=j.sectors?.[1]||[];counter=data.length;render();});
+.then(j=>{
+  data=j.sectors?.[PAGE_SECTOR] || [];
+  counter=data.length;
+  render();
+});
 
+/* ================= RENDER ================= */
 function render(){
- group.clearLayers();layers={};
- data.forEach(b=>{
-  const r=L.rectangle(b.boundsLatLng,{color:"#ff9800",weight:2,fillColor:"#ffd280",fillOpacity:.35}).addTo(group);
-  r.bindTooltip(`Sector-1 : ${b.rangeText}`,{sticky:true});
-  layers[b.id]=r;
- });
+  group.clearLayers();
+  layers={};
+  data.forEach(b=>{
+    const r=L.rectangle(b.boundsLatLng,{
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:.35
+    }).addTo(group);
+    r.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
+    layers[b.id]=r;
+  });
 }
 
-/* 🔍 SEARCH — MANDATORY SECTOR PREFIX */
+/* ================= ✅ FIXED SEARCH LOGIC ================= */
 searchBtn.onclick=()=>{
- const raw=searchInput.value.trim().toUpperCase();
- const m=raw.match(/^([12])-(.+)$/);
- if(!m) return alert("❌ Use format like 1-B-720 or 2-B-720");
+  const raw=searchInput.value.trim().toUpperCase();
+  const m=raw.match(/^([12])-(.+)$/);
 
- const quarter=m[2];
- const found=data.find(d=>d.expanded.includes(quarter));
- if(!found) return alert(`❌ ${quarter} not found in Sector-1`);
+  if(!m){
+    alert("❌ Use format like 1-B-168 or 2-B-168");
+    return;
+  }
 
- clearHighlight(false);
- const l=layers[found.id];
- l.setStyle({color:"#2e7d32",weight:4,fillColor:"#66bb6a",fillOpacity:.55});
- lastHighlighted=l;
- map.fitBounds(l.getBounds().pad(.35));
+  const inputSector=parseInt(m[1],10);
+  const quarter=m[2];
+
+  const found=data.find(d =>
+    d.sector===inputSector &&
+    d.expanded.includes(quarter)
+  );
+
+  if(!found){
+    alert(`❌ ${quarter} not found in Sector-${inputSector}`);
+    return;
+  }
+
+  clearHighlight(false);
+
+  const l=layers[found.id];
+  l.setStyle({
+    color:"#2e7d32",
+    weight:4,
+    fillColor:"#66bb6a",
+    fillOpacity:.55
+  });
+
+  lastHighlighted=l;
+  map.fitBounds(l.getBounds().pad(.35));
 };
 
 clearBtn.onclick=()=>clearHighlight(true);
-function clearHighlight(r){if(lastHighlighted){lastHighlighted.setStyle({color:"#ff9800",weight:2,fillColor:"#ffd280",fillOpacity:.35});lastHighlighted=null;}if(r)map.fitBounds(bounds);}
 
-/* ADMIN / DRAW / SAVE — UNCHANGED */
-unlockBtn.onclick=()=>{if(adminPass.value==="NALCO123"){admin=true;adminTools.style.display="block";alert("Admin unlocked")}else alert("Wrong password")};
+function clearHighlight(reset){
+  if(lastHighlighted){
+    lastHighlighted.setStyle({
+      color:"#ff9800",
+      weight:2,
+      fillColor:"#ffd280",
+      fillOpacity:.35
+    });
+    lastHighlighted=null;
+  }
+  if(reset) map.fitBounds(bounds);
+}
 
-const draw=new L.Control.Draw({draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}});
-toggleDraw.onclick=()=>{if(!admin)return alert("Admin only");editor=!editor;toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";editor?map.addControl(draw):map.removeControl(draw)};
+/* ================= ADMIN / DRAW / SAVE ================= */
+unlockBtn.onclick=()=>{
+  if(adminPass.value==="NALCO123"){
+    admin=true;
+    adminTools.style.display="block";
+    alert("Admin unlocked");
+  }else alert("Wrong password");
+};
+
+const draw=new L.Control.Draw({
+  draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
+});
+
+toggleDraw.onclick=()=>{
+  if(!admin) return alert("Admin only");
+  editor=!editor;
+  toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
+  editor?map.addControl(draw):map.removeControl(draw);
+};
 
 map.on(L.Draw.Event.CREATED,e=>{
- if(!editor)return;
- const range=prompt("Enter range (Example: B-720-735)");
- const exp=expand(range); if(!exp.length)return;
- const b=e.layer.getBounds();
- data.push({id:"id_"+(++counter),sector:SECTOR,rangeText:range.toUpperCase(),expanded:exp,boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]});
- render();
+  if(!editor) return;
+  const range=prompt("Enter range (Example: B-168-179)");
+  if(!range) return;
+
+  const exp=expand(range);
+  if(!exp.length) return alert("Invalid range");
+
+  const b=e.layer.getBounds();
+  data.push({
+    id:"id_"+(++counter),
+    sector:PAGE_SECTOR,
+    rangeText:range.toUpperCase(),
+    expanded:exp,
+    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
+  });
+  render();
 });
 
 downloadJson.onclick=()=>{
- const blob=new Blob([JSON.stringify({sectors:{1:data}},null,2)],{type:"application/json"});
- const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="sector1_ranges.json";a.click();
+  const blob=new Blob([JSON.stringify({sectors:{1:data}},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="sector1_ranges.json";
+  a.click();
 };
 
 saveGithub.onclick=async()=>{
- if(!admin)return;
- let t=localStorage.getItem("GITHUB_TOKEN")||prompt("Enter GitHub Token");
- localStorage.setItem("GITHUB_TOKEN",t);
- const body={message:"Update sector-1 map",content:btoa(JSON.stringify({sectors:{1:data}},null,2))};
- const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector1_ranges.json";
- const r=await fetch(api,{headers:{Authorization:"Bearer "+t}}); if(r.ok)body.sha=(await r.json()).sha;
- const res=await fetch(api,{method:"PUT",headers:{Authorization:"Bearer "+t,"Content-Type":"application/json"},body:JSON.stringify(body)});
- alert(res.ok?"✅ Sector-1 Saved":"❌ Save failed");
+  if(!admin) return;
+  let token=localStorage.getItem("GITHUB_TOKEN")||prompt("Enter GitHub Token");
+  localStorage.setItem("GITHUB_TOKEN",token);
+
+  const body={
+    message:"Update sector-1 map",
+    content:btoa(JSON.stringify({sectors:{1:data}},null,2))
+  };
+
+  const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector1_ranges.json";
+  const r=await fetch(api,{headers:{Authorization:"Bearer "+token}});
+  if(r.ok) body.sha=(await r.json()).sha;
+
+  const res=await fetch(api,{
+    method:"PUT",
+    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+    body:JSON.stringify(body)
+  });
+
+  alert(res.ok?"✅ Sector-1 Saved":"❌ Save failed");
 };
 
+/* ================= UTIL ================= */
 function expand(s){
- s=s.replace(/\s/g,"").toUpperCase();
- const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/); if(!m)return[];
- const a=+m[2],b=+m[3]||a,o=[];
- for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
- return o;
+  s=s.replace(/\s/g,"").toUpperCase();
+  const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
+  if(!m) return [];
+  const a=+m[2], b=+m[3]||a;
+  const o=[];
+  for(let i=Math.min(a,b);i<=Math.max(a,b);i++) o.push(`${m[1]}-${i}`);
+  return o;
 }
 </script>
 </body>
