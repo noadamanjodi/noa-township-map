@@ -143,6 +143,7 @@ function render(){
       weight:2,
       fillOpacity:.35
     }).bindTooltip(`Sector-${b.sector} | ${b.rangeText}`);
+    rect.options.originalColor = rect.options.color;
     rect.addTo(map);
     layers[b.id] = rect;
   });
@@ -153,7 +154,7 @@ function resetAll(){
   highlighted.forEach(l=>l.setStyle({
     weight:2,
     fillOpacity:.35,
-    color:l.options.color
+    color: l.options.originalColor
   }));
   highlighted=[];
   searchInput.value="";
