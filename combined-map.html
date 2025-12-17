@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Combined Map for sector--1&2</title>
+<title>Township Combined Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -11,12 +11,7 @@
 <style>
 html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
 .app{height:100%;display:flex;flex-direction:column}
-header{
-  background:#003f88;color:#fff;
-  padding:12px;font-size:18px;
-  font-weight:600;text-align:center;
-  user-select:none;
-}
+header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600;text-align:center}
 .content{flex:1;display:flex;min-height:0}
 
 .sidebar{
@@ -27,22 +22,11 @@ header{
 .panel{margin-bottom:14px}
 
 input,button{
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid #ccc;
-  margin-top:8px;
-  font-size:15px
+  width:100%;padding:12px;border-radius:10px;
+  border:1px solid #ccc;margin-top:8px;font-size:15px
 }
-button{
-  cursor:pointer;
-  font-weight:600;
-  border:none;
-  background:#ffd24d
-}
+button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 .reset{background:#e0e7ff;color:#003f88}
-.admin{background:#b6e57a}
-.save{background:#9fd0ff}
 
 #msgBox{
   display:none;
@@ -55,28 +39,24 @@ button{
   color:#b00020
 }
 
-/* 🔒 ADMIN UI HIDDEN BY DEFAULT */
-#adminSection{display:none}
-
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
 
-/* Autosuggest */
+/* autosuggest */
 .suggest-box{
-  background:#fff;
-  border-radius:10px;
+  background:#fff;border-radius:10px;
   box-shadow:0 6px 18px rgba(0,0,0,.2);
-  display:none;
-  max-height:220px;
-  overflow:auto
+  display:none;max-height:220px;overflow:auto
 }
 .suggest-item{
-  padding:10px;
-  border-bottom:1px solid #eee;
+  padding:10px;border-bottom:1px solid #eee;
   cursor:pointer
 }
 .suggest-item:hover{background:#eef4ff}
+
+/* 🔒 ADMIN COMPLETELY HIDDEN */
+#adminSection{display:none}
 
 @media(max-width:768px){
   .content{flex-direction:column}
@@ -87,7 +67,7 @@ button{
 
 <body>
 <div class="app">
-<header id="secretHeader">Township Combined Map – Sector 1 & 2</header>
+<header>Township Combined Map – Sector 1 & 2</header>
 
 <div class="content">
 
@@ -95,27 +75,20 @@ button{
 
 <div class="panel">
   <strong>Search Quarter</strong>
-  <input id="searchInput" placeholder="Example: 1-B-720">
+  <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168">
   <button id="searchBtn">Find</button>
   <button class="reset" id="resetBtn">Reset</button>
   <div id="msgBox"></div>
   <div id="suggestBox" class="suggest-box"></div>
 </div>
 
-<!-- 🔒 HIDDEN ADMIN SECTION -->
+<!-- 🔒 Admin exists but is hidden -->
 <div id="adminSection">
-
-  <div class="panel">
-    <input id="adminPass" type="password" placeholder="Admin Password">
-    <button class="admin" id="unlockBtn">Unlock Admin</button>
-  </div>
-
-  <div class="panel" id="adminTools" style="display:none">
-    <button id="toggleDraw">Enable Drawing</button>
-    <button id="exportBtn">Export Selected Block</button>
-    <button class="save" id="saveGithub">Save to GitHub</button>
-  </div>
-
+  <input id="adminPass" type="password">
+  <button id="unlockBtn"></button>
+  <button id="toggleDraw"></button>
+  <button id="exportBtn"></button>
+  <button id="saveGithub"></button>
 </div>
 
 </aside>
@@ -131,23 +104,111 @@ button{
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-/* ================= SECRET ADMIN REVEAL ================= */
-let tapCount=0;
-const header=document.getElementById("secretHeader");
+/* ================= CONFIG ================= */
+const IMG_W=4400, IMG_H=3080;
+const IMG1="./sector1.png";
+const IMG2="./sector2.png";
 
-header.onclick=()=>{
-  tapCount++;
-  if(tapCount===5){
-    document.getElementById("adminSection").style.display="block";
-    alert("Admin login enabled");
-  }
-  setTimeout(()=>tapCount=0,1200);
+const JSON1="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
+const JSON2="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
+
+/* ================= MAP ================= */
+const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
+const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
+const fullBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
+
+L.imageOverlay(IMG1,bounds1).addTo(map);
+L.imageOverlay(IMG2,bounds2).addTo(map);
+map.fitBounds(fullBounds);
+
+/* ================= STATE ================= */
+let data=[], layers={}, last=null;
+const group=L.featureGroup().addTo(map);
+
+/* ================= MESSAGE ================= */
+const msgBox=document.getElementById("msgBox");
+function showMsg(t){msgBox.innerText=t;msgBox.style.display="block"}
+function clearMsg(){msgBox.style.display="none"}
+
+/* ================= LOAD DATA ================= */
+Promise.all([
+  fetch(JSON1).then(r=>r.json()),
+  fetch(JSON2).then(r=>r.json())
+]).then(([j1,j2])=>{
+  data=[
+    ...(j1.sectors?.[1]||[]).map(b=>({...b,map:1})),
+    ...(j2.sectors?.[2]||[]).map(b=>({...b,map:2}))
+  ];
+  render();
+});
+
+/* ================= SHIFT ================= */
+function shift(b,mapNo){
+  return mapNo===2
+    ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
+    : b;
+}
+
+/* ================= RENDER ================= */
+function render(){
+  group.clearLayers();
+  layers={};
+  data.forEach(b=>{
+    const r=L.rectangle(shift(b.boundsLatLng,b.map),{
+      color:b.sector===1?"#1976d2":"#c62828",
+      weight:2,
+      fillOpacity:.35
+    }).addTo(group);
+    layers[b.id]=r;
+  });
+}
+
+/* ================= SEARCH ================= */
+searchBtn.onclick=()=>{
+  clearMsg();
+  const m=searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
+  if(!m){showMsg("Use format 1-B-720 or 2-B-720");return}
+
+  const s=+m[1], q=m[2];
+  const f=data.find(d=>d.sector===s && d.expanded.includes(q));
+  if(!f){showMsg("Quarter not found");return}
+
+  if(last) last.setStyle({weight:2,fillOpacity:.35});
+  const l=layers[f.id];
+  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
+  last=l;
+  map.fitBounds(l.getBounds().pad(.35));
 };
 
-/* ================= EXISTING LOGIC (UNCHANGED) ================= */
-/* 🔴 Your existing map, search, autosuggest, admin logic stays exactly the same */
-/* 🔴 Paste your previous JS below this line if separated */
-</script>
+/* ================= RESET ================= */
+resetBtn.onclick=()=>{
+  clearMsg();
+  if(last){last.setStyle({weight:2,fillOpacity:.35});last=null}
+  map.fitBounds(fullBounds);
+};
 
+/* ================= AUTOSUGGEST ================= */
+searchInput.oninput=()=>{
+  const q=searchInput.value.toUpperCase();
+  suggestBox.innerHTML="";
+  if(q.length<3){suggestBox.style.display="none";return}
+
+  const out=[];
+  data.forEach(d=>d.expanded.forEach(b=>{
+    const v=`${d.sector}-${b}`;
+    if(v.startsWith(q)) out.push(v);
+  }));
+
+  [...new Set(out)].slice(0,15).forEach(v=>{
+    const d=document.createElement("div");
+    d.className="suggest-item";
+    d.textContent=v;
+    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";searchBtn.onclick()};
+    suggestBox.appendChild(d);
+  });
+  suggestBox.style.display=out.length?"block":"none";
+};
+</script>
 </body>
 </html>
