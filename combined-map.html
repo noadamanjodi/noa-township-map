@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Township Combined Map – Sector 1 & 2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:#f4f6fb;
+}
+.app{height:100%;display:flex;flex-direction:column}
+header{
+  background:#003f88;
+  color:#fff;
+  padding:12px;
+  font-size:18px;
+  font-weight:600;
+  text-align:center
+}
+.content{flex:1;display:flex;min-height:0}
+
+/* SIDEBAR */
+.sidebar{
+  width:320px;
+  background:#fff;
+  padding:14px;
+  box-shadow:2px 0 12px rgba(0,0,0,.1)
+}
+.panel{margin-bottom:16px}
+input,button{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid #ccc;
+  margin-top:8px;
+  font-size:15px
+}
+button{
+  cursor:pointer;
+  font-weight:600;
+  background:#ffd24d;
+  border:none
+}
+.toggle label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:15px;
+  margin-top:6px
+}
+
+/* MAP */
+.map-wrap{flex:1}
+#map{width:100%;height:100%}
+.leaflet-image-layer{pointer-events:none}
+
+/* MOBILE */
+@media(max-width:768px){
+  .content{flex-direction:column}
+  .sidebar{width:100%}
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+<header>Township Map – Sector 1 & Sector 2</header>
+
+<div class="content">
+
+<aside class="sidebar">
+
+  <!-- SEARCH -->
+  <div class="panel">
+    <strong>Search Quarter</strong>
+    <input id="searchInput" placeholder="Example: 1-B-168 or 2-B-168">
+    <button id="searchBtn">🔍 Find</button>
+  </div>
+
+  <!-- TOGGLES -->
+  <div class="panel toggle">
+    <strong>Show / Hide Sectors</strong>
+    <label><input type="checkbox" id="chk1" checked> Sector-1</label>
+    <label><input type="checkbox" id="chk2" checked> Sector-2</label>
+  </div>
+
+</aside>
+
+<div class="map-wrap">
+  <div id="map"></div>
+</div>
+
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/* ================= MAP ================= */
+const IMG_W = 4400;
+const IMG_H = 3080;
+
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds = [
+  map.unproject([0,IMG_H],0),
+  map.unproject([IMG_W,0],0)
+];
+
+/* ================= IMAGE OVERLAYS ================= */
+const overlay1 = L.imageOverlay("./sector1.png", bounds).addTo(map);
+const overlay2 = L.imageOverlay("./sector2.png", bounds).addTo(map);
+map.fitBounds(bounds);
+
+/* ================= GROUPS ================= */
+const group1 = L.featureGroup().addTo(map);
+const group2 = L.featureGroup().addTo(map);
+
+const layers = {1:{}, 2:{}};
+let data = [];
+
+/* ================= LOAD JSONs ================= */
+Promise.all([
+  fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json").then(r=>r.json()),
+  fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json").then(r=>r.json())
+]).then(([s1,s2])=>{
+  data = [
+    ...(s1.sectors?.[1] || []),
+    ...(s2.sectors?.[2] || [])
+  ];
+  render();
+});
+
+/* ================= RENDER ================= */
+function render(){
+  group1.clearLayers();
+  group2.clearLayers();
+
+  data.forEach(b=>{
+    const rect = L.rectangle(b.boundsLatLng,{
+      color: b.sector===1 ? "#1976d2" : "#c62828",
+      weight:2,
+      fillOpacity:0.35
+    });
+
+    rect.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
+
+    if(b.sector===1){
+      rect.addTo(group1);
+      layers[1][b.id]=rect;
+    }else{
+      rect.addTo(group2);
+      layers[2][b.id]=rect;
+    }
+  });
+}
+
+/* ================= SEARCH (CORRECT) ================= */
+searchBtn.onclick=()=>{
+  const raw = searchInput.value.trim().toUpperCase();
+  const m = raw.match(/^([12])-(.+)$/);
+
+  if(!m){
+    alert("Use format: 1-B-168 or 2-B-168");
+    return;
+  }
+
+  const sector = parseInt(m[1],10);
+  const quarter = m[2];
+
+  const found = data.find(d =>
+    d.sector === sector &&
+    d.expanded.includes(quarter)
+  );
+
+  if(!found){
+    alert("Block not found");
+    return;
+  }
+
+  const layer = layers[sector][found.id];
+  map.fitBounds(layer.getBounds().pad(0.35));
+};
+
+/* ================= TOGGLES ================= */
+chk1.onchange=()=>{
+  chk1.checked ? map.addLayer(group1) : map.removeLayer(group1);
+  chk1.checked ? map.addLayer(overlay1) : map.removeLayer(overlay1);
+};
+
+chk2.onchange=()=>{
+  chk2.checked ? map.addLayer(group2) : map.removeLayer(group2);
+  chk2.checked ? map.addLayer(overlay2) : map.removeLayer(overlay2);
+};
+</script>
+</body>
+</html>
