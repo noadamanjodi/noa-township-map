@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Combined Map – Admin Enabled</title>
+<title>Township Combined Map – Final</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -15,8 +15,9 @@ header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600
 .content{flex:1;display:flex;min-height:0}
 
 .sidebar{
-  width:320px;background:#fff;padding:14px;
+  width:330px;background:#fff;padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.15);
+  overflow:auto
 }
 .panel{margin-bottom:14px}
 input,button{
@@ -26,10 +27,23 @@ input,button{
 button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 .admin{background:#b6e57a}
 .save{background:#9fd0ff}
+.clear{background:#e0e7ff;color:#003f88}
 
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
+
+/* Autosuggest */
+.suggest-box{
+  background:#fff;border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.2);
+  display:none;max-height:220px;overflow:auto
+}
+.suggest-item{
+  padding:10px;border-bottom:1px solid #eee;
+  cursor:pointer
+}
+.suggest-item:hover{background:#eef4ff}
 
 @media(max-width:768px){
   .content{flex-direction:column}
@@ -40,32 +54,34 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 
 <body>
 <div class="app">
-<header>Township Combined Map (Sector-Aware + Admin)</header>
+<header>Township Combined Map – Final Admin Version</header>
 
 <div class="content">
 
 <aside class="sidebar">
-  <div class="panel">
-    <strong>Search Quarter</strong>
-    <input id="searchInput" placeholder="Example: 1-B-145 or 2-B-720">
-    <button id="searchBtn">🔍 Find</button>
-  </div>
 
-  <div class="panel">
-    <button id="adminBtn">Admin Login</button>
-    <input id="adminPass" type="password" placeholder="Password">
-    <button class="admin" id="unlockBtn">Unlock</button>
-  </div>
+<div class="panel">
+  <strong>Search Quarter</strong>
+  <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168">
+  <button id="searchBtn">🔍 Find</button>
+  <div id="suggestBox" class="suggest-box"></div>
+</div>
 
-  <div class="panel" id="adminTools" style="display:none">
-    <button id="toggleDraw">Enable Drawing</button>
-    <button id="exportBtn">Export Selected Block</button>
-  </div>
+<div class="panel">
+  <button id="adminBtn">Admin Login</button>
+  <input id="adminPass" type="password" placeholder="Password">
+  <button class="admin" id="unlockBtn">Unlock</button>
+</div>
+
+<div class="panel" id="adminTools" style="display:none">
+  <button id="toggleDraw">Enable Drawing</button>
+  <button id="exportBtn">📄 Export Selected Block</button>
+  <button class="save" id="saveGithub">☁️ Save to GitHub</button>
+</div>
+
 </aside>
 
-<div class="map-wrap">
-  <div id="map"></div>
-</div>
+<div class="map-wrap"><div id="map"></div></div>
 
 </div>
 </div>
@@ -84,7 +100,6 @@ const JSON2="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/mai
 
 /* ================= MAP ================= */
 const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-
 const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
 const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
 
@@ -94,21 +109,34 @@ L.imageOverlay(IMG2,bounds2).addTo(map);
 map.fitBounds([map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)]);
 
 /* ================= DATA ================= */
-let data=[], layers={}, last=null, selectedBlock=null;
+let data=[], layers={}, last=null, selected=null;
 const group=L.featureGroup().addTo(map);
+
+/* ================= AUTO-MIGRATE ================= */
+function migrate(arr,sector){
+  return arr.map(b=>{
+    if(b.map===undefined) b.map=sector;
+    return b;
+  });
+}
 
 /* ================= LOAD ================= */
 Promise.all([
   fetch(JSON1).then(r=>r.json()),
   fetch(JSON2).then(r=>r.json())
 ]).then(([j1,j2])=>{
-  data=[...(j1.sectors?.[1]||[]),...(j2.sectors?.[2]||[])];
+  data=[
+    ...migrate(j1.sectors?.[1]||[],1),
+    ...migrate(j2.sectors?.[2]||[],2)
+  ];
   render();
 });
 
 /* ================= UTIL ================= */
 function shift(b,mapNo){
-  return mapNo===2 ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]] : b;
+  return mapNo===2
+    ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
+    : b;
 }
 
 /* ================= RENDER ================= */
@@ -117,15 +145,15 @@ function render(){
   layers={};
 
   data.forEach(b=>{
-    const r=L.rectangle(shift(b.boundsLatLng,b.map||b.sector),{
-      color:b.sector===1?"#1976d2":"#c62828",
-      weight:2,fillOpacity:.35
-    }).addTo(group);
+    const r=L.rectangle(
+      shift(b.boundsLatLng,b.map),
+      {color:b.sector===1?"#1976d2":"#c62828",weight:2,fillOpacity:.35}
+    ).addTo(group);
 
     r.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
 
     r.on("click",()=>{
-      selectedBlock=b;
+      selected=b;
       navigator.clipboard.writeText(`${b.sector}-${b.expanded[0]}`);
     });
 
@@ -136,10 +164,10 @@ function render(){
 /* ================= SEARCH ================= */
 searchBtn.onclick=()=>{
   const m=searchInput.value.toUpperCase().match(/^([12])-(.+)$/);
-  if(!m) return alert("Use 1-B-145 format only");
+  if(!m) return alert("Use 1-B-720 format only");
 
   const s=+m[1], q=m[2];
-  const f=data.find(d=>d.sector===s && d.expanded.includes(q));
+  const f=data.find(d=>d.sector===s&&d.expanded.includes(q));
   if(!f) return alert("Not found");
 
   if(last) last.setStyle({weight:2,fillOpacity:.35});
@@ -147,6 +175,28 @@ searchBtn.onclick=()=>{
   l.setStyle({weight:4,fillOpacity:.6,color:"#2e7d32"});
   last=l;
   map.fitBounds(l.getBounds().pad(.35));
+};
+
+/* ================= AUTOSUGGEST ================= */
+searchInput.oninput=()=>{
+  const q=searchInput.value.toUpperCase();
+  suggestBox.innerHTML="";
+  if(q.length<3){suggestBox.style.display="none";return;}
+
+  const out=[];
+  data.forEach(d=>d.expanded.forEach(b=>{
+    const v=`${d.sector}-${b}`;
+    if(v.startsWith(q)) out.push(v);
+  }));
+
+  [...new Set(out)].slice(0,20).forEach(v=>{
+    const d=document.createElement("div");
+    d.className="suggest-item";
+    d.textContent=v;
+    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";searchBtn.onclick();}
+    suggestBox.appendChild(d);
+  });
+  suggestBox.style.display=out.length?"block":"none";
 };
 
 /* ================= ADMIN ================= */
@@ -174,9 +224,9 @@ toggleDraw.onclick=()=>{
 map.on(L.Draw.Event.CREATED,e=>{
   if(!editor) return;
 
-  const sector=+prompt("Enter sector (1 or 2)");
+  const sector=+prompt("Sector (1 or 2)");
   const mapNo=+prompt("Map image (1=Top, 2=Bottom)");
-  const range=prompt("Enter range (B-145-160)");
+  const range=prompt("Range (B-145-160)");
 
   if(!sector||!mapNo||!range) return;
 
@@ -193,13 +243,53 @@ map.on(L.Draw.Event.CREATED,e=>{
 
 /* ================= EXPORT ================= */
 exportBtn.onclick=()=>{
-  if(!selectedBlock) return alert("Select a block first");
-  const blob=new Blob([JSON.stringify(selectedBlock,null,2)],{type:"application/json"});
+  if(!selected) return alert("Select a block");
+  const blob=new Blob([JSON.stringify(selected,null,2)],{type:"application/json"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download="block.json";
   a.click();
 };
+
+/* ================= SAVE TO GITHUB ================= */
+saveGithub.onclick=async()=>{
+  if(!admin) return alert("Admin only");
+
+  let token=localStorage.getItem("GITHUB_TOKEN");
+  if(!token){
+    token=prompt("Enter GitHub Token (repo access)");
+    if(!token) return;
+    localStorage.setItem("GITHUB_TOKEN",token);
+  }
+
+  const s1=data.filter(d=>d.sector===1);
+  const s2=data.filter(d=>d.sector===2);
+
+  await saveFile("sector1_ranges.json",{sectors:{1:s1}},token);
+  await saveFile("sector2_ranges.json",{sectors:{2:s2}},token);
+
+  alert("✅ Saved to GitHub");
+};
+
+async function saveFile(file,json,token){
+  const api=`https://api.github.com/repos/noadamanjodi/noa-township-map/contents/${file}`;
+  let sha=null;
+  const r=await fetch(api,{headers:{Authorization:`Bearer ${token}`}});
+  if(r.ok) sha=(await r.json()).sha;
+
+  const body={
+    message:"Update township map",
+    content:btoa(unescape(encodeURIComponent(JSON.stringify(json,null,2))))
+  };
+  if(sha) body.sha=sha;
+
+  const res=await fetch(api,{
+    method:"PUT",
+    headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error("Save failed");
+}
 
 /* ================= UTIL ================= */
 function expand(s){
