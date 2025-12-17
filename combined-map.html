@@ -2,295 +2,204 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Combined Map</title>
+<title>Quarter Search</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
-
 <style>
-html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
-.app{height:100%;display:flex;flex-direction:column}
-header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600;text-align:center}
-.content{flex:1;display:flex;min-height:0}
-
-/* ===== SIDEBAR ===== */
-.sidebar{
-  width:350px;background:#fff;padding:14px;
-  box-shadow:2px 0 12px rgba(0,0,0,.15);
-  overflow:auto
+body{
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:#f4f6fb;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
 }
-.panel{margin-bottom:14px}
+
+.card{
+  background:#fff;
+  width:100%;
+  max-width:420px;
+  padding:22px;
+  border-radius:18px;
+  box-shadow:0 12px 30px rgba(0,0,0,.15);
+}
+
+h2{
+  margin:0 0 6px;
+  text-align:center;
+  color:#003f88;
+}
+
+small{
+  display:block;
+  text-align:center;
+  color:#555;
+  margin-bottom:14px;
+}
+
 input,button{
-  width:100%;padding:12px;border-radius:10px;
-  border:1px solid #ccc;margin-top:8px;font-size:15px
-}
-button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
-.reset{background:#e0e7ff;color:#003f88}
-.admin{background:#b6e57a}
-.save{background:#9fd0ff}
-
-/* ===== MESSAGE ===== */
-#msgBox{
-  display:none;margin-top:10px;padding:10px;
-  border-radius:8px;font-size:14px;font-weight:600;
-  background:#ffe4e4;color:#b00020
+  width:100%;
+  padding:14px;
+  border-radius:12px;
+  border:1px solid #ccc;
+  font-size:16px;
 }
 
-/* ===== AUTOSUGGEST ===== */
-.suggest-box{
-  background:#fff;border-radius:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,.2);
-  display:none;max-height:220px;overflow:auto
+button{
+  margin-top:12px;
+  background:#ffd24d;
+  border:none;
+  font-weight:600;
+  cursor:pointer;
 }
-.suggest-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
-.suggest-item:hover{background:#eef4ff}
 
-/* ===== MAP ===== */
-.map-wrap{flex:1}
-#map{width:100%;height:100%}
-.leaflet-image-layer{pointer-events:none}
-
-/* ===== MOBILE MODE ===== */
-@media(max-width:768px){
-  header{font-size:16px;padding:10px}
-  .content{flex-direction:column}
-  .sidebar{
-    position:fixed;
-    bottom:0;left:0;
-    width:100%;
-    max-height:55%;
-    border-radius:20px 20px 0 0;
-    box-shadow:0 -8px 25px rgba(0,0,0,.25);
-    z-index:2000
-  }
-  #map{height:100vh}
+.reset{
+  background:#e3ecff;
+  color:#003f88;
 }
+
+#result{
+  margin-top:14px;
+  padding:12px;
+  border-radius:10px;
+  background:#eef4ff;
+  display:none;
+  font-size:15px;
+}
+
+#error{
+  background:#ffe4e4;
+  color:#b00020;
+}
+
+.suggest{
+  border:1px solid #ddd;
+  border-radius:12px;
+  margin-top:6px;
+  max-height:220px;
+  overflow:auto;
+  display:none;
+}
+
+.item{
+  padding:10px;
+  border-bottom:1px solid #eee;
+  cursor:pointer;
+}
+.item:hover{background:#f0f6ff}
 </style>
 </head>
 
 <body>
-<div class="app">
-<header>Township Combined Map – Sector-1 & Sector-2</header>
+<div class="card">
+  <h2>Quarter Search</h2>
+  <small>Format: <b>1-B-529</b> (Sector-Block-Quarter)</small>
 
-<div class="content">
+  <input id="qInput" placeholder="1-B-529">
+  <div id="suggest" class="suggest"></div>
 
-<aside class="sidebar">
-  <div class="panel">
-    <strong>Search Quarter</strong><br>
-    <small>Format: <b>1-B-720</b> (1 = Sector)</small>
-    <input id="searchInput" placeholder="1-B-720">
-    <div id="suggestBox" class="suggest-box"></div>
-    <button id="searchBtn">🔍 Find</button>
-    <button class="reset" id="resetBtn">🔄 Reset</button>
-    <div id="msgBox"></div>
-  </div>
+  <button id="findBtn">🔍 Find Quarter</button>
+  <button class="reset" id="resetBtn">🔄 Reset</button>
 
-  <div class="panel">
-    <input id="adminPass" type="password" placeholder="Admin password">
-    <button class="admin" id="unlockBtn">Unlock Admin</button>
-  </div>
-
-  <div class="panel" id="adminTools" style="display:none">
-    <button id="toggleDraw">Enable Drawing</button>
-    <button id="exportBtn">📄 Export Selected Block</button>
-    <button class="save" id="saveGithub">☁️ Save to GitHub</button>
-  </div>
-</aside>
-
-<div class="map-wrap"><div id="map"></div></div>
+  <div id="result"></div>
 </div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-/* ================= CONFIG ================= */
-const IMG_W=4400, IMG_H=3080;
-const IMG_TOP="./sector1.png";
-const IMG_BOTTOM="./sector2.png";
-const JSON_URL="./township_blocks.json";
+const JSON_URL = "township_blocks.json";
 
-/* ================= MAP ================= */
-const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const topBounds=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
-const bottomBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
-const fullBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
+let blocks=[];
 
-L.imageOverlay(IMG_TOP,topBounds).addTo(map);
-L.imageOverlay(IMG_BOTTOM,bottomBounds).addTo(map);
-map.fitBounds(fullBounds);
-
-const group=L.featureGroup().addTo(map);
-
-/* ================= STATE ================= */
-let blocks=[], layers={}, highlighted=null, selected=null;
-let admin=false, editor=false;
-
-/* ================= MESSAGE ================= */
-const msgBox=document.getElementById("msgBox");
-const showMsg=t=>{msgBox.innerText=t;msgBox.style.display="block"};
-const clearMsg=()=>msgBox.style.display="none";
-
-/* ================= LOAD JSON ================= */
+/* LOAD JSON */
 fetch(JSON_URL+"?t="+Date.now())
-.then(r=>r.json())
-.then(j=>{
-  blocks=j.blocks||[];
-  render();
+  .then(r=>r.json())
+  .then(j=>blocks=j.blocks||[]);
+
+/* ELEMENTS */
+const input=document.getElementById("qInput");
+const suggest=document.getElementById("suggest");
+const result=document.getElementById("result");
+
+/* AUTO UPPERCASE */
+input.addEventListener("input",()=>{
+  input.value=input.value.toUpperCase();
+  buildSuggest(input.value);
 });
 
-/* ================= SHIFT ================= */
-function shift(b,mapNo){
-  return mapNo===2
-    ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
-    : b;
-}
-
-/* ================= RENDER ================= */
-function render(){
-  group.clearLayers(); layers={};
-  blocks.forEach(b=>{
-    const r=L.rectangle(
-      shift(b.boundsLatLng,b.map),
-      {color:b.sector===1?"#1976d2":"#c62828",weight:2,fillOpacity:.35}
-    ).addTo(group);
-    r.bindTooltip(`Sector ${b.sector} • ${b.rangeText}`);
-    r.on("click",()=>selected=b);
-    layers[b.id]=r;
-  });
-}
-
-/* ================= SEARCH ================= */
-searchBtn.onclick=()=>{
-  clearMsg();
-  const m=searchInput.value.trim().toUpperCase()
-    .match(/^([12])-([A-Z])-(\d+)$/);
-  if(!m){showMsg("Use format 1-B-720");return;}
-
-  const sector=+m[1], q=`${m[2]}-${m[3]}`;
-  const f=blocks.find(b=>b.sector===sector && b.expanded.includes(q));
-  if(!f){showMsg("Quarter not found in this sector");return;}
-
-  if(highlighted)highlighted.setStyle({weight:2,fillOpacity:.35});
-  const l=layers[f.id];
-  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
-  highlighted=l;
-  map.fitBounds(l.getBounds().pad(.35));
-
-  if(window.innerWidth<768){
-    document.querySelector(".sidebar").style.maxHeight="120px";
-  }
-};
-
-/* ================= RESET ================= */
-resetBtn.onclick=()=>{
-  clearMsg(); searchInput.value="";
-  suggestBox.style.display="none";
-  if(highlighted){
-    highlighted.setStyle({weight:2,fillOpacity:.35});
-    highlighted=null;
-  }
-  map.fitBounds(fullBounds);
-  if(window.innerWidth<768){
-    document.querySelector(".sidebar").style.maxHeight="55%";
-  }
-};
-
-/* ================= AUTOSUGGEST + AUTO UPPERCASE ================= */
-searchInput.oninput=()=>{
-  searchInput.value=searchInput.value.toUpperCase();
-  const q=searchInput.value;
-  suggestBox.innerHTML="";
-  if(q.length<3){suggestBox.style.display="none";return;}
+/* SUGGEST */
+function buildSuggest(val){
+  suggest.innerHTML="";
+  if(val.length<3){suggest.style.display="none";return;}
 
   const out=[];
-  blocks.forEach(b=>b.expanded.forEach(e=>{
-    const v=`${b.sector}-${e}`;
-    if(v.startsWith(q)) out.push(v);
-  }));
+  blocks.forEach(b=>{
+    b.expanded.forEach(e=>{
+      const v=`${b.sector}-${e}`;
+      if(v.startsWith(val)) out.push(v);
+    });
+  });
 
-  [...new Set(out)].slice(0,20).forEach(v=>{
+  [...new Set(out)].slice(0,15).forEach(v=>{
     const d=document.createElement("div");
-    d.className="suggest-item";
+    d.className="item";
     d.textContent=v;
     d.onclick=()=>{
-      searchInput.value=v;
-      suggestBox.style.display="none";
-      searchBtn.onclick();
+      input.value=v;
+      suggest.style.display="none";
+      search();
     };
-    suggestBox.appendChild(d);
+    suggest.appendChild(d);
   });
-  suggestBox.style.display=out.length?"block":"none";
-};
 
-/* ===== MOBILE MAP FREEZE WHILE TYPING ===== */
-searchInput.addEventListener("focus",()=>{
-  map.dragging.disable();
-  map.touchZoom.disable();
-});
-searchInput.addEventListener("blur",()=>{
-  map.dragging.enable();
-  map.touchZoom.enable();
-});
-
-/* ================= ADMIN ================= */
-unlockBtn.onclick=()=>{
-  if(adminPass.value==="NALCO123"){
-    admin=true;
-    adminTools.style.display="block";
-    alert("Admin unlocked");
-  }else alert("Wrong password");
-};
-
-/* ================= DRAW ================= */
-const draw=new L.Control.Draw({
-  draw:{rectangle:true,marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
-});
-toggleDraw.onclick=()=>{
-  if(!admin)return;
-  editor=!editor;
-  editor?map.addControl(draw):map.removeControl(draw);
-};
-
-map.on(L.Draw.Event.CREATED,e=>{
-  if(!editor)return;
-  const sector=+prompt("Sector (1/2)");
-  const mapNo=+prompt("Map (1=Top, 2=Bottom)");
-  const range=prompt("Range (B-145-160)");
-  if(!sector||!mapNo||!range)return;
-
-  const b=e.layer.getBounds();
-  blocks.push({
-    id:"id_"+Date.now(),
-    sector,map:mapNo,
-    rangeText:range.toUpperCase(),
-    expanded:expand(range),
-    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
-  });
-  render();
-};
-
-/* ================= EXPORT ================= */
-exportBtn.onclick=()=>{
-  if(!selected)return alert("Select a block");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(selected,null,2)]));
-  a.download=selected.id+".json";a.click();
-};
-
-/* ================= SAVE TO GITHUB ================= */
-saveGithub.onclick=()=>alert("GitHub save logic already provided earlier");
-
-/* ================= UTIL ================= */
-function expand(s){
-  const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
-  if(!m)return[];
-  const a=+m[2],b=+m[3]||a,o=[];
-  for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
-  return o;
+  suggest.style.display=out.length?"block":"none";
 }
+
+/* SEARCH */
+function search(){
+  result.style.display="none";
+
+  const m=input.value.trim().match(/^([12])-([A-Z])-(\d+)$/);
+  if(!m){
+    showError("Use format: 1-B-529");
+    return;
+  }
+
+  const sector=+m[1];
+  const q=`${m[2]}-${m[3]}`;
+
+  const found=blocks.find(b=>
+    b.sector===sector && b.expanded.includes(q)
+  );
+
+  if(!found){
+    showError("Quarter not found in this sector");
+    return;
+  }
+
+  result.style.display="block";
+  result.innerHTML=
+    `<b>FOUND ✔</b><br>
+     Sector : ${found.sector}<br>
+     Range  : ${found.rangeText}<br>
+     Map    : ${found.map}`;
+}
+
+/* RESET */
+resetBtn.onclick=()=>{
+  input.value="";
+  suggest.style.display="none";
+  result.style.display="none";
+};
+
+/* HELPERS */
+function showError(msg){
+  result.style.display="block";
+  result.id="error";
+  result.textContent=msg;
+  setTimeout(()=>result.id="result",0);
+}
+
+findBtn.onclick=search;
 </script>
 </body>
 </html>
