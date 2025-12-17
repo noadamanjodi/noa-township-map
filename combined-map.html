@@ -2,43 +2,76 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Combined Map</title>
+<title>Township Combined Map – Sector 1 & 2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
-html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:#f4f6fb;
+}
 .app{height:100%;display:flex;flex-direction:column}
 header{
-  background:#003f88;color:#fff;
-  padding:12px;font-size:18px;
-  font-weight:600;text-align:center
+  background:#003f88;
+  color:#fff;
+  padding:12px;
+  font-size:18px;
+  font-weight:600;
+  text-align:center
 }
 .content{flex:1;display:flex;min-height:0}
 
+/* SIDEBAR */
 .sidebar{
-  width:330px;background:#fff;padding:14px;
-  box-shadow:2px 0 12px rgba(0,0,0,.15);
-  overflow:auto
+  width:320px;
+  background:#fff;
+  padding:14px;
+  box-shadow:2px 0 12px rgba(0,0,0,.1);
+  position:relative;
 }
-
-.panel{margin-bottom:14px}
+.panel{margin-bottom:16px}
 input,button{
-  width:100%;padding:12px;
-  border-radius:10px;border:1px solid #ccc;
-  margin-top:8px;font-size:15px
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid #ccc;
+  margin-top:8px;
+  font-size:15px
 }
-button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
-.reset{background:#e0e7ff;color:#003f88}
-
-#msg{
-  display:none;margin-top:10px;
-  padding:10px;border-radius:8px;
-  font-size:14px;font-weight:600;
-  background:#ffe4e4;color:#b00020
+button{
+  cursor:pointer;
+  font-weight:600;
+  background:#ffd24d;
+  border:none
 }
 
+/* AUTOSUGGEST */
+.suggest-box{
+  position:absolute;
+  top:120px;
+  left:14px;
+  right:14px;
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+  z-index:2000;
+  max-height:220px;
+  overflow:auto;
+  display:none;
+}
+.suggest-item{
+  padding:10px 12px;
+  cursor:pointer;
+  font-size:15px;
+  border-bottom:1px solid #eee;
+}
+.suggest-item:hover{background:#eef4ff}
+
+/* MAP */
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
@@ -52,18 +85,16 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 
 <body>
 <div class="app">
-<header>Township Combined Map – Sector 1 & 2</header>
+<header>Township Map – Sector 1 (Top) & Sector 2 (Bottom)</header>
 
 <div class="content">
 
 <aside class="sidebar">
   <div class="panel">
-    <strong>Search Quarter</strong><br>
-    <small>Format: <b>1-B-720</b> (Sector-Block-Quarter)</small>
-    <input id="search" placeholder="1-B-66">
-    <button onclick="doSearch()">🔍 Find Quarter</button>
-    <button class="reset" onclick="resetMap()">🔄 Reset</button>
-    <div id="msg"></div>
+    <strong>Search Quarter</strong>
+    <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
+    <button id="searchBtn">🔍 Find</button>
+    <div id="suggestBox" class="suggest-box"></div>
   </div>
 </aside>
 
@@ -77,110 +108,157 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-/* ================= CONFIG ================= */
-const IMG_W = 4400, IMG_H = 3080;
-const IMG1 = "./sector1.png";
-const IMG2 = "./sector2.png";
-const JSON_URL = "./township_blocks.json";
-
 /* ================= MAP ================= */
+const IMG_W = 4400;
+const IMG_H = 3080;
+
 const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const bounds1 = [map.unproject([0,IMG_H],0), map.unproject([IMG_W,0],0)];
-const bounds2 = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,IMG_H],0)];
-const fullBounds = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,0],0)];
+const bounds = [
+  map.unproject([0,IMG_H],0),
+  map.unproject([IMG_W,0],0)
+];
 
-L.imageOverlay(IMG1,bounds1).addTo(map);
-L.imageOverlay(IMG2,bounds2).addTo(map);
-map.fitBounds(fullBounds);
+/* ================= IMAGE LAYERS ================= */
+L.imageOverlay("./sector2.png", bounds).addTo(map); // bottom
+L.imageOverlay("./sector1.png", bounds).addTo(map); // top
+map.fitBounds(bounds);
 
-/* ================= STATE ================= */
-let blocks=[], rects={}, active=null;
-const layer = L.featureGroup().addTo(map);
+/* ================= GROUPS ================= */
+const group1 = L.featureGroup().addTo(map);
+const group2 = L.featureGroup().addTo(map);
 
-/* ================= LOAD JSON ================= */
-fetch(JSON_URL).then(r=>r.json()).then(j=>{
-  blocks = j.blocks;
-  drawAll();
-});
+const layers = {1:{},2:{}};
+let data = [];
+let highlighted = [];
 
-/* ================= DRAW ================= */
-function shift(b,mapNo){
-  return mapNo===2
-    ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
-    : b;
-}
+/* ================= LOAD NEW JSON ================= */
+fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/township_blocks.json?t=" + Date.now())
+  .then(r => r.json())
+  .then(json => {
 
-function drawAll(){
-  layer.clearLayers();
-  rects={};
+    // supports both flat & sector-wise JSON
+    if (Array.isArray(json.blocks)) {
+      data = json.blocks;
+    } else if (json.sectors) {
+      data = [
+        ...(json.sectors[1] || []),
+        ...(json.sectors[2] || [])
+      ];
+    } else {
+      alert("❌ Invalid township_blocks.json structure");
+      return;
+    }
 
-  blocks.forEach(b=>{
-    const r=L.rectangle(
-      shift(b.boundsLatLng,b.map),
-      {
-        color: b.sector===1 ? "#1976d2" : "#c62828",
-        weight:2,
-        fillOpacity:0.35
-      }
-    ).addTo(layer);
+    render();
+  })
+  .catch(()=>{
+    alert("❌ Unable to load township_blocks.json");
+  });
 
-    r.bindTooltip(
-      `Sector ${b.sector} | ${b.rangeText}`,
-      {sticky:true}
-    );
+/* ================= RENDER ================= */
+function render(){
+  data.forEach(b=>{
+    const rect = L.rectangle(b.boundsLatLng,{
+      color: b.sector===1 ? "#1976d2" : "#c62828",
+      weight:2,
+      fillOpacity:0.35
+    }).bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
 
-    rects[b.id]=r;
+    if(b.sector===1){
+      rect.addTo(group1);
+      layers[1][b.id]=rect;
+    }else{
+      rect.addTo(group2);
+      layers[2][b.id]=rect;
+    }
   });
 }
 
+/* ================= RESET ================= */
+function resetHighlight(){
+  highlighted.forEach(l=>{
+    l.setStyle({weight:2,fillOpacity:0.35});
+  });
+  highlighted=[];
+}
+
 /* ================= SEARCH ================= */
-function doSearch(){
-  hideMsg();
-  const v = search.value.trim().toUpperCase();
-  search.value = v; // auto uppercase
+function doSearch(raw){
+  resetHighlight();
 
-  const m = v.match(/^([12])\-([A-Z]\-\d+)$/);
-  if(!m){ showMsg("Use exact format: 1-B-66"); return; }
+  const m = raw.match(/^([12])\-([A-Z]\-\d+)$/);
+  if(!m){
+    alert("❌ Use format: 1-B-720 or 2-B-168 only");
+    return;
+  }
 
-  const sector = Number(m[1]);
-  const qtr = m[2];
+  const sector = +m[1];
+  const quarter = m[2];
 
-  const found = blocks.find(b =>
-    b.sector===sector &&
-    b.expanded.includes(qtr)
+  const matches = data.filter(d =>
+    d.sector===sector && d.expanded.includes(quarter)
   );
 
-  if(!found){ showMsg("Quarter not found in this sector"); return; }
-
-  if(active){
-    active.setStyle({weight:2,fillOpacity:0.35});
+  if(!matches.length){
+    alert(`❌ ${quarter} not found in Sector-${sector}`);
+    return;
   }
 
-  const r = rects[found.id];
-  r.setStyle({color:"#2e7d32",weight:4,fillOpacity:0.6});
-  active = r;
-  map.fitBounds(r.getBounds().pad(0.35));
+  matches.forEach(b=>{
+    const l = layers[sector][b.id];
+    l.setStyle({weight:4,fillOpacity:0.6});
+    highlighted.push(l);
+  });
+
+  map.fitBounds(highlighted[0].getBounds().pad(0.35));
 }
 
-/* ================= RESET ================= */
-function resetMap(){
-  hideMsg();
-  search.value="";
-  if(active){
-    active.setStyle({weight:2,fillOpacity:0.35});
-    active=null;
+searchBtn.onclick=()=>{
+  const v = searchInput.value.trim().toUpperCase();
+  if(v) doSearch(v);
+};
+
+/* ================= AUTO-SUGGEST ================= */
+const suggestBox = document.getElementById("suggestBox");
+
+searchInput.oninput=()=>{
+  const q = searchInput.value.trim().toUpperCase();
+  suggestBox.innerHTML="";
+
+  if(q.length<3){
+    suggestBox.style.display="none";
+    return;
   }
-  map.fitBounds(fullBounds);
-}
 
-/* ================= MSG ================= */
-function showMsg(t){
-  msg.innerText=t;
-  msg.style.display="block";
-}
-function hideMsg(){
-  msg.style.display="none";
-}
+  const results = [];
+
+  data.forEach(d=>{
+    d.expanded.forEach(b=>{
+      const v = `${d.sector}-${b}`;
+      if(v.startsWith(q)) results.push(v);
+    });
+  });
+
+  [...new Set(results)].slice(0,20).forEach(v=>{
+    const div=document.createElement("div");
+    div.className="suggest-item";
+    div.textContent=v;
+    div.onclick=()=>{
+      searchInput.value=v;
+      suggestBox.style.display="none";
+      doSearch(v);
+    };
+    suggestBox.appendChild(div);
+  });
+
+  suggestBox.style.display = results.length ? "block" : "none";
+};
+
+document.addEventListener("click",e=>{
+  if(!suggestBox.contains(e.target) && e.target!==searchInput){
+    suggestBox.style.display="none";
+  }
+});
 </script>
 </body>
 </html>
