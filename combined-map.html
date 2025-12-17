@@ -26,48 +26,26 @@ input,button{
   border:1px solid #ccc;margin-top:8px;font-size:15px
 }
 button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
+.reset{background:#e0e7ff;color:#003f88}
 .admin{background:#b6e57a}
 .save{background:#9fd0ff}
-.reset{background:#e0e7ff;color:#003f88}
+
+#msgBox{
+  display:none;
+  margin-top:10px;
+  padding:10px;
+  border-radius:8px;
+  font-size:14px;
+  font-weight:600
+}
+.error{background:#ffe4e4;color:#b00020}
+.success{background:#e6fffa;color:#00695c}
 
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
 
-/* ================= MOBILE ADMIN LAYOUT ================= */
-.mobile-admin-bar{
-  display:none;
-  position:fixed;
-  bottom:0;left:0;right:0;
-  background:#003f88;
-  color:#fff;
-  text-align:center;
-  padding:10px;
-  font-weight:600;
-  z-index:9999;
-}
-
-.mobile-admin-panel{
-  display:none;
-  position:fixed;
-  bottom:52px;left:0;right:0;
-  background:#fff;
-  box-shadow:0 -6px 18px rgba(0,0,0,.25);
-  padding:12px;
-  z-index:9999;
-}
-
-.mobile-admin-panel .panel{
-  margin-bottom:10px;
-}
-
-.mobile-admin-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-}
-
-/* ================= AUTOSUGGEST ================= */
+/* Autosuggest */
 .suggest-box{
   background:#fff;border-radius:10px;
   box-shadow:0 6px 18px rgba(0,0,0,.2);
@@ -79,23 +57,16 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 }
 .suggest-item:hover{background:#eef4ff}
 
-/* ================= MOBILE SWITCH ================= */
 @media(max-width:768px){
   .content{flex-direction:column}
   .sidebar{width:100%}
-
-  /* Hide admin section in sidebar */
-  #adminSection{display:none}
-
-  /* Show mobile admin bar */
-  .mobile-admin-bar{display:block}
 }
 </style>
 </head>
 
 <body>
 <div class="app">
-<header>Township Combined Map – Final Admin Version</header>
+<header>Township Combined Map – Sector 1 & 2</header>
 
 <div class="content">
 
@@ -103,64 +74,164 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 
 <div class="panel">
   <strong>Search Quarter</strong>
-  <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168">
+  <input id="searchInput" placeholder="Example: 1-B-720">
   <button id="searchBtn">🔍 Find</button>
-  <button class="reset" id="resetBtn">🔄 Reset Highlight</button>
+  <button class="reset" id="resetBtn">🔄 Reset</button>
+  <div id="msgBox"></div>
   <div id="suggestBox" class="suggest-box"></div>
 </div>
 
-<!-- ================= DESKTOP ADMIN ================= -->
-<div id="adminSection">
-  <div class="panel">
-    <button id="adminBtn">Admin Login</button>
-    <input id="adminPass" type="password" placeholder="Password">
-    <button class="admin" id="unlockBtn">Unlock</button>
-  </div>
+<div class="panel">
+  <button id="adminBtn">Admin Login</button>
+  <input id="adminPass" type="password" placeholder="Password">
+  <button class="admin" id="unlockBtn">Unlock</button>
+</div>
 
-  <div class="panel" id="adminTools" style="display:none">
-    <button id="toggleDraw">Enable Drawing</button>
-    <button id="exportBtn">📄 Export Selected Block</button>
-    <button class="save" id="saveGithub">☁️ Save to GitHub</button>
-  </div>
+<div class="panel" id="adminTools" style="display:none">
+  <button id="toggleDraw">Enable Drawing</button>
+  <button id="exportBtn">📄 Export Selected Block</button>
+  <button class="save" id="saveGithub">☁️ Save to GitHub</button>
 </div>
 
 </aside>
 
-<div class="map-wrap"><div id="map"></div></div>
+<div class="map-wrap">
+  <div id="map"></div>
+</div>
 
 </div>
 </div>
 
-<!-- ================= MOBILE ADMIN ================= -->
-<div class="mobile-admin-bar" onclick="
-  const p=document.getElementById('mobileAdminPanel');
-  p.style.display=p.style.display==='block'?'none':'block';
-">
-  🔐 Admin Tools
-</div>
-
-<div class="mobile-admin-panel" id="mobileAdminPanel">
-  <div class="panel">
-    <button id="adminBtn">Admin Login</button>
-    <input id="adminPass" type="password" placeholder="Password">
-    <button class="admin" id="unlockBtn">Unlock</button>
-  </div>
-
-  <div class="panel" id="adminTools" style="display:none">
-    <div class="mobile-admin-grid">
-      <button id="toggleDraw">Enable Drawing</button>
-      <button id="exportBtn">📄 Export</button>
-      <button class="save" id="saveGithub">☁️ GitHub</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================= SCRIPTS (UNCHANGED) ================= -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
-<!-- 🔴 YOUR ORIGINAL JAVASCRIPT GOES HERE — UNCHANGED -->
-<!-- 🔴 NO LOGIC WAS MODIFIED -->
+<script>
+/* ================= CONFIG ================= */
+const IMG_W=4400, IMG_H=3080;
+const IMG1="./sector1.png";
+const IMG2="./sector2.png";
 
+const JSON1="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
+const JSON2="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
+
+/* ================= MAP ================= */
+const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
+const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
+const fullBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
+
+L.imageOverlay(IMG1,bounds1).addTo(map);
+L.imageOverlay(IMG2,bounds2).addTo(map);
+map.fitBounds(fullBounds);
+
+/* ================= STATE ================= */
+let data=[], layers={}, lastHighlighted=null, selected=null;
+const group=L.featureGroup().addTo(map);
+
+/* ================= MESSAGE ================= */
+const msgBox=document.getElementById("msgBox");
+function showMsg(text,type){
+  msgBox.className=type;
+  msgBox.innerText=text;
+  msgBox.style.display="block";
+}
+function clearMsg(){msgBox.style.display="none";}
+
+/* ================= LOAD DATA ================= */
+Promise.all([
+  fetch(JSON1).then(r=>r.json()),
+  fetch(JSON2).then(r=>r.json())
+]).then(([j1,j2])=>{
+  data=[
+    ...(j1.sectors?.[1]||[]).map(b=>({...b,map:1})),
+    ...(j2.sectors?.[2]||[]).map(b=>({...b,map:2}))
+  ];
+  render();
+});
+
+/* ================= SHIFT ================= */
+function shift(b,mapNo){
+  return mapNo===2
+    ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
+    : b;
+}
+
+/* ================= RENDER ================= */
+function render(){
+  group.clearLayers();
+  layers={};
+
+  data.forEach(b=>{
+    const r=L.rectangle(shift(b.boundsLatLng,b.map),{
+      color:b.sector===1?"#1976d2":"#c62828",
+      weight:2,
+      fillOpacity:.35
+    }).addTo(group);
+
+    r.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
+    layers[b.id]=r;
+  });
+}
+
+/* ================= SEARCH ================= */
+searchBtn.onclick=()=>{
+  clearMsg();
+  const m=searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
+  if(!m){
+    showMsg("❌ Use format like 1-B-720","error");
+    return;
+  }
+
+  const sector=+m[1], q=m[2];
+  const f=data.find(d=>d.sector===sector && d.expanded.includes(q));
+
+  if(!f){
+    showMsg(`❌ Quarter ${m[0]} not found in loaded sectors`,"error");
+    return;
+  }
+
+  if(lastHighlighted){
+    lastHighlighted.setStyle({weight:2,fillOpacity:.35});
+  }
+
+  const l=layers[f.id];
+  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
+  lastHighlighted=l;
+  map.fitBounds(l.getBounds().pad(.35));
+};
+
+/* ================= RESET ================= */
+resetBtn.onclick=()=>{
+  clearMsg();
+  if(lastHighlighted){
+    lastHighlighted.setStyle({weight:2,fillOpacity:.35});
+    lastHighlighted=null;
+  }
+  map.fitBounds(fullBounds);
+};
+
+/* ================= AUTOSUGGEST ================= */
+searchInput.oninput=()=>{
+  const q=searchInput.value.toUpperCase();
+  suggestBox.innerHTML="";
+  if(q.length<3){suggestBox.style.display="none";return;}
+
+  const list=[];
+  data.forEach(d=>d.expanded.forEach(b=>{
+    const v=`${d.sector}-${b}`;
+    if(v.startsWith(q)) list.push(v);
+  }));
+
+  [...new Set(list)].slice(0,15).forEach(v=>{
+    const d=document.createElement("div");
+    d.className="suggest-item";
+    d.textContent=v;
+    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";searchBtn.onclick();}
+    suggestBox.appendChild(d);
+  });
+
+  suggestBox.style.display=list.length?"block":"none";
+};
+</script>
 </body>
 </html>
