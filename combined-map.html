@@ -124,28 +124,43 @@ function render(){
 }
 
 /* SEARCH — FIXED */
-searchBtn.onclick=()=>{
+searchBtn.onclick = () => {
   clearMsg();
-  const m=searchInput.value.trim().toUpperCase()
-    .match(/^([12])-([A-Z]-\d+)$/);
 
-  if(!m){showMsg("Use format 1-B-529");return}
+  const m = searchInput.value.trim().toUpperCase()
+    .match(/^([12])-([A-Z])-(\d+)$/);
 
-  const sector=+m[1];
-  const quarter=m[2];
+  if (!m) {
+    showMsg("Use format 1-B-65");
+    return;
+  }
 
-  const found=data.find(d =>
-    d.sector===sector &&
-    d.expanded.includes(quarter)
+  const sector = +m[1];
+  const block = m[2];
+  const num = m[3];
+  const target = `${block}-${num}`;
+
+  const found = data.find(d =>
+    d.sector === sector &&
+    d.expanded.some(e => e === target)
   );
 
-  if(!found){showMsg("Quarter not found in this sector");return}
+  if (!found) {
+    showMsg("Quarter not found in this sector");
+    return;
+  }
 
-  if(last) last.setStyle({weight:2,fillOpacity:.35});
-  const l=layers[found.id];
-  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
-  last=l;
-  map.fitBounds(l.getBounds().pad(.35));
+  if (last) last.setStyle({ weight: 2, fillOpacity: .35 });
+
+  const layer = layers[found.id];
+  layer.setStyle({
+    color: "#2e7d32",
+    weight: 4,
+    fillOpacity: .6
+  });
+
+  last = layer;
+  map.fitBounds(layer.getBounds().pad(0.35));
 };
 
 /* RESET */
