@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Combined Map – Sector 1 & 2</title>
+<title>Township Combined Map – Admin Enabled</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
 <style>
 html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
@@ -17,7 +17,6 @@ header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600
 .sidebar{
   width:320px;background:#fff;padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.15);
-  position:relative
 }
 .panel{margin-bottom:14px}
 input,button{
@@ -25,30 +24,12 @@ input,button{
   border:1px solid #ccc;margin-top:8px;font-size:15px
 }
 button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
+.admin{background:#b6e57a}
+.save{background:#9fd0ff}
 
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
-
-/* Auto-suggest */
-.suggest-box{
-  position:absolute;top:115px;left:14px;right:14px;
-  background:#fff;border-radius:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,.2);
-  z-index:2000;display:none;max-height:240px;overflow:auto
-}
-.suggest-item{
-  padding:10px 12px;border-bottom:1px solid #eee;
-  cursor:pointer;font-size:15px
-}
-.suggest-item:hover{background:#eef4ff}
-
-/* Sector Labels */
-.sector-label{
-  background:#fff;padding:6px 12px;
-  border-radius:20px;font-weight:700;
-  box-shadow:0 4px 10px rgba(0,0,0,.2)
-}
 
 @media(max-width:768px){
   .content{flex-direction:column}
@@ -59,16 +40,26 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 
 <body>
 <div class="app">
-<header>Township Combined Map – Sector-1 (Top) & Sector-2 (Bottom)</header>
+<header>Township Combined Map (Sector-Aware + Admin)</header>
 
 <div class="content">
 
 <aside class="sidebar">
   <div class="panel">
     <strong>Search Quarter</strong>
-    <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
+    <input id="searchInput" placeholder="Example: 1-B-145 or 2-B-720">
     <button id="searchBtn">🔍 Find</button>
-    <div id="suggestBox" class="suggest-box"></div>
+  </div>
+
+  <div class="panel">
+    <button id="adminBtn">Admin Login</button>
+    <input id="adminPass" type="password" placeholder="Password">
+    <button class="admin" id="unlockBtn">Unlock</button>
+  </div>
+
+  <div class="panel" id="adminTools" style="display:none">
+    <button id="toggleDraw">Enable Drawing</button>
+    <button id="exportBtn">Export Selected Block</button>
   </div>
 </aside>
 
@@ -80,45 +71,33 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-minimap/dist/Control.MiniMap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
 /* ================= CONFIG ================= */
-const IMG_W = 4400, IMG_H = 3080;
-const IMG1 = "./sector1.png";
-const IMG2 = "./sector2.png";
-const JSON1 = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
-const JSON2 = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
+const IMG_W=4400, IMG_H=3080;
+const IMG1="./sector1.png";
+const IMG2="./sector2.png";
+
+const JSON1="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
+const JSON2="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
 
 /* ================= MAP ================= */
-const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
 
-/* Bounds */
-const bounds1 = [map.unproject([0,IMG_H],0), map.unproject([IMG_W,0],0)];
-const bounds2 = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,IMG_H],0)];
+const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
+const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
 
 L.imageOverlay(IMG1,bounds1).addTo(map);
 L.imageOverlay(IMG2,bounds2).addTo(map);
 
-map.fitBounds([map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,0],0)]);
-
-/* ================= MINI MAP ================= */
-const miniLayer = L.imageOverlay(IMG1,bounds1);
-new L.Control.MiniMap(miniLayer,{toggleDisplay:true}).addTo(map);
-
-/* ================= SECTOR LABELS ================= */
-L.marker(map.unproject([IMG_W/2,200],0),{
-  icon:L.divIcon({className:"sector-label",html:"SECTOR-1 MAP"})
-}).addTo(map);
-
-L.marker(map.unproject([IMG_W/2,IMG_H+200],0),{
-  icon:L.divIcon({className:"sector-label",html:"SECTOR-2 MAP"})
-}).addTo(map);
+map.fitBounds([map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)]);
 
 /* ================= DATA ================= */
-let data=[], layers={1:{},2:{}}, last=null;
+let data=[], layers={}, last=null, selectedBlock=null;
 const group=L.featureGroup().addTo(map);
 
+/* ================= LOAD ================= */
 Promise.all([
   fetch(JSON1).then(r=>r.json()),
   fetch(JSON2).then(r=>r.json())
@@ -127,58 +106,109 @@ Promise.all([
   render();
 });
 
-/* Shift sector-2 blocks down */
-function shift(b,sector){
-  return sector===2 ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]] : b;
+/* ================= UTIL ================= */
+function shift(b,mapNo){
+  return mapNo===2 ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]] : b;
 }
 
-/* Render */
+/* ================= RENDER ================= */
 function render(){
+  group.clearLayers();
+  layers={};
+
   data.forEach(b=>{
-    const rect=L.rectangle(shift(b.boundsLatLng,b.sector),{
+    const r=L.rectangle(shift(b.boundsLatLng,b.map||b.sector),{
       color:b.sector===1?"#1976d2":"#c62828",
       weight:2,fillOpacity:.35
-    }).bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true}).addTo(group);
-    layers[b.sector][b.id]=rect;
+    }).addTo(group);
+
+    r.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
+
+    r.on("click",()=>{
+      selectedBlock=b;
+      navigator.clipboard.writeText(`${b.sector}-${b.expanded[0]}`);
+    });
+
+    layers[b.id]=r;
   });
 }
 
-/* Search */
-function search(v){
-  const m=v.match(/^([12])-(.+)$/);
-  if(!m) return alert("Use 1-B-720 or 2-B-168 only");
+/* ================= SEARCH ================= */
+searchBtn.onclick=()=>{
+  const m=searchInput.value.toUpperCase().match(/^([12])-(.+)$/);
+  if(!m) return alert("Use 1-B-145 format only");
+
   const s=+m[1], q=m[2];
-  const f=data.find(d=>d.sector===s&&d.expanded.includes(q));
+  const f=data.find(d=>d.sector===s && d.expanded.includes(q));
   if(!f) return alert("Not found");
+
   if(last) last.setStyle({weight:2,fillOpacity:.35});
-  const l=layers[s][f.id];
+  const l=layers[f.id];
   l.setStyle({weight:4,fillOpacity:.6,color:"#2e7d32"});
   last=l;
   map.fitBounds(l.getBounds().pad(.35));
-}
-
-searchBtn.onclick=()=>search(searchInput.value.toUpperCase());
-
-/* ================= AUTO-SUGGEST ================= */
-const suggestBox=document.getElementById("suggestBox");
-searchInput.oninput=()=>{
-  const q=searchInput.value.toUpperCase();
-  suggestBox.innerHTML="";
-  if(q.length<3){suggestBox.style.display="none";return;}
-  const out=[];
-  data.forEach(d=>d.expanded.forEach(b=>{
-    const v=`${d.sector}-${b}`;
-    if(v.startsWith(q)) out.push(v);
-  }));
-  [...new Set(out)].slice(0,20).forEach(v=>{
-    const d=document.createElement("div");
-    d.className="suggest-item";
-    d.textContent=v;
-    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";search(v);}
-    suggestBox.appendChild(d);
-  });
-  suggestBox.style.display=out.length?"block":"none";
 };
+
+/* ================= ADMIN ================= */
+let admin=false, editor=false;
+
+unlockBtn.onclick=()=>{
+  if(adminPass.value==="NALCO123"){
+    admin=true;
+    adminTools.style.display="block";
+    alert("Admin unlocked");
+  }else alert("Wrong password");
+};
+
+const draw=new L.Control.Draw({
+  draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
+});
+
+toggleDraw.onclick=()=>{
+  if(!admin) return alert("Admin only");
+  editor=!editor;
+  toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
+  editor?map.addControl(draw):map.removeControl(draw);
+};
+
+map.on(L.Draw.Event.CREATED,e=>{
+  if(!editor) return;
+
+  const sector=+prompt("Enter sector (1 or 2)");
+  const mapNo=+prompt("Map image (1=Top, 2=Bottom)");
+  const range=prompt("Enter range (B-145-160)");
+
+  if(!sector||!mapNo||!range) return;
+
+  const b=e.layer.getBounds();
+  data.push({
+    id:"id_"+Date.now(),
+    sector, map:mapNo,
+    rangeText:range.toUpperCase(),
+    expanded:expand(range),
+    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
+  });
+  render();
+});
+
+/* ================= EXPORT ================= */
+exportBtn.onclick=()=>{
+  if(!selectedBlock) return alert("Select a block first");
+  const blob=new Blob([JSON.stringify(selectedBlock,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="block.json";
+  a.click();
+};
+
+/* ================= UTIL ================= */
+function expand(s){
+  const m=s.replace(/\s/g,"").toUpperCase().match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
+  if(!m) return [];
+  const a=+m[2], b=+m[3]||a, o=[];
+  for(let i=Math.min(a,b);i<=Math.max(a,b);i++) o.push(`${m[1]}-${i}`);
+  return o;
+}
 </script>
 </body>
 </html>
