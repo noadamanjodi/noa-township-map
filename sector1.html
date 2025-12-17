@@ -2,247 +2,222 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Sector-1 Township Map</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Township Combined Map – Sector 1 & 2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
 <style>
 html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
 .app{height:100%;display:flex;flex-direction:column}
-header{background:#003f88;color:#fff;padding:12px 16px;font-size:18px;font-weight:600;text-align:center}
+header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600;text-align:center}
 .content{flex:1;display:flex;min-height:0}
-.sidebar{width:320px;background:#fff;padding:14px;overflow:auto;box-shadow:2px 0 12px rgba(0,0,0,.1)}
-.panel{margin-bottom:14px}
-input,button{width:100%;padding:12px;border-radius:10px;border:1px solid #ccc;margin-top:8px;font-size:15px}
-button{cursor:pointer;font-weight:600;border:none}
-.find{background:#ffd24d}
-.clear{background:#e0e7ff;color:#003f88}
-.unlock{background:#b6e57a}
-.save{background:#9fd0ff}
+
+.sidebar{
+  width:320px;background:#fff;padding:14px;
+  box-shadow:2px 0 12px rgba(0,0,0,.1);
+  position:relative
+}
+input,button{
+  width:100%;padding:12px;border-radius:10px;
+  border:1px solid #ccc;margin-top:8px;font-size:15px
+}
+.find{background:#ffd24d;font-weight:600;border:none;cursor:pointer}
+.reset{background:#e0e0e0;font-weight:600;border:none;cursor:pointer}
+
+.suggest-box{
+  position:absolute;left:14px;right:14px;top:150px;
+  background:#fff;border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+  max-height:220px;overflow:auto;display:none;z-index:999
+}
+.suggest-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
+.suggest-item:hover{background:#eef4ff}
+
+/* INLINE ERROR (ADDED) */
+#errorMsg{
+  display:none;
+  margin-top:10px;
+  padding:10px;
+  border-radius:8px;
+  background:#ffe5e5;
+  color:#b00020;
+  font-weight:600;
+  font-size:14px;
+}
+
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
-@media(max-width:768px){.content{flex-direction:column}.sidebar{width:100%}}
 </style>
 </head>
 
 <body>
 <div class="app">
-<header>Sector-1 Township Map</header>
+<header>Township Map – Sector 1 (Top) & Sector 2 (Bottom)</header>
 
 <div class="content">
 <aside class="sidebar">
+  <strong>Search Quarter</strong>
+  <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
+  <button id="searchBtn" class="find">🔍 Find</button>
+  <button id="resetBtn" class="reset">🔄 Reset</button>
 
-<div class="panel">
-<label><strong>Search Quarter</strong></label>
-<input id="searchInput" placeholder="Example: 1-B-168 or 2-B-168">
-<button class="find" id="searchBtn">🔍 Find</button>
-<button class="clear" id="clearBtn">❌ Clear</button>
-</div>
+  <!-- ERROR MESSAGE (ADDED) -->
+  <div id="errorMsg"></div>
 
-<div class="panel">
-<button id="adminBtn">Admin Login</button>
-<input id="adminPass" type="password" placeholder="Password">
-<button class="unlock" id="unlockBtn">Unlock</button>
-</div>
-
-<div class="panel" id="adminTools" style="display:none">
-<button id="toggleDraw">Enable Drawing</button>
-<button id="downloadJson">Download JSON</button>
-<button class="save" id="saveGithub">Save to GitHub</button>
-</div>
-
+  <div id="suggestBox" class="suggest-box"></div>
 </aside>
 
-<div class="map-wrap"><div id="map"></div></div>
+<div class="map-wrap">
+  <div id="map"></div>
+</div>
 </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
 /* ================= CONFIG ================= */
-const PAGE_SECTOR = 1;
 const IMG_W = 4400;
 const IMG_H = 3080;
-const IMAGE_URL = "./sector1.png";
-const JSON_URL  = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
-
-/* ================= STATE ================= */
-let admin=false, editor=false;
-let data=[], layers={}, counter=0, lastHighlighted=null;
 
 /* ================= MAP ================= */
-const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const bounds=[
-  map.unproject([0,IMG_H],0),
-  map.unproject([IMG_W,0],0)
-];
-L.imageOverlay(IMAGE_URL,bounds).addTo(map);
-map.fitBounds(bounds);
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
 
-const group=L.featureGroup().addTo(map);
+const FULL_BOUNDS = [
+  map.unproject([0, IMG_H * 2],0),
+  map.unproject([IMG_W, 0],0)
+];
+
+/* ================= IMAGE LAYERS ================= */
+L.imageOverlay("./sector1.png", [
+  map.unproject([0, IMG_H],0),
+  map.unproject([IMG_W, 0],0)
+]).addTo(map);
+
+L.imageOverlay("./sector2.png", [
+  map.unproject([0, IMG_H * 2],0),
+  map.unproject([IMG_W, IMG_H],0)
+]).addTo(map);
+
+map.fitBounds(FULL_BOUNDS);
+
+/* ================= DATA ================= */
+const layers={};
+let data=[], highlighted=[];
+
+/* ================= ERROR HELPERS (ADDED) ================= */
+const errorMsg=document.getElementById("errorMsg");
+
+function showError(msg){
+  errorMsg.innerText=msg;
+  errorMsg.style.display="block";
+}
+function clearError(){
+  errorMsg.style.display="none";
+}
 
 /* ================= LOAD JSON ================= */
-fetch(JSON_URL+"?t="+Date.now())
+fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/township_blocks.json")
 .then(r=>r.json())
 .then(j=>{
-  data=j.sectors?.[PAGE_SECTOR] || [];
-  counter=data.length;
+  data = j.blocks || [];
   render();
 });
 
 /* ================= RENDER ================= */
+function applyMapOffset(bounds, mapNo){
+  if(mapNo !== 2) return bounds;
+  return [
+    [bounds[0][0] - IMG_H, bounds[0][1]],
+    [bounds[1][0] - IMG_H, bounds[1][1]]
+  ];
+}
+
 function render(){
-  group.clearLayers();
-  layers={};
   data.forEach(b=>{
-    const r=L.rectangle(b.boundsLatLng,{
-      color:"#ff9800",
+    const finalBounds = applyMapOffset(b.boundsLatLng, b.map);
+    const rect = L.rectangle(finalBounds,{
+      color: b.sector === 1 ? "#1976d2" : "#c62828",
       weight:2,
-      fillColor:"#ffd280",
       fillOpacity:.35
-    }).addTo(group);
-    r.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
-    layers[b.id]=r;
+    }).bindTooltip(`Sector-${b.sector} | ${b.rangeText}`);
+    rect.addTo(map);
+    layers[b.id] = rect;
   });
 }
 
-/* ================= ✅ FIXED SEARCH LOGIC ================= */
-searchBtn.onclick=()=>{
-  const raw=searchInput.value.trim().toUpperCase();
-  const m=raw.match(/^([12])-(.+)$/);
+/* ================= RESET ================= */
+function resetAll(){
+  highlighted.forEach(l=>l.setStyle({
+    weight:2,
+    fillOpacity:.35,
+    color:l.options.color
+  }));
+  highlighted=[];
+  searchInput.value="";
+  clearError();              /* ADDED */
+  map.fitBounds(FULL_BOUNDS);
+}
 
+/* ================= SEARCH ================= */
+function doSearch(v){
+  resetAll();
+
+  const m=v.match(/^([12])\-([A-Z]\-\d+)$/);
   if(!m){
-    alert("❌ Use format like 1-B-168 or 2-B-168");
+    showError("❌ Use format 1-B-720 or 2-B-168");
     return;
   }
 
-  const inputSector=parseInt(m[1],10);
-  const quarter=m[2];
+  const sector=+m[1], q=m[2];
+  const found=data.filter(d=>d.sector===sector && d.expanded.includes(q));
 
-  const found=data.find(d =>
-    d.sector===inputSector &&
-    d.expanded.includes(quarter)
-  );
-
-  if(!found){
-    alert(`❌ ${quarter} not found in Sector-${inputSector}`);
+  if(!found.length){
+    showError("❌ Quarter not found");
     return;
   }
 
-  clearHighlight(false);
-
-  const l=layers[found.id];
-  l.setStyle({
-    color:"#2e7d32",
-    weight:4,
-    fillColor:"#66bb6a",
-    fillOpacity:.55
+  found.forEach(b=>{
+    const l=layers[b.id];
+    l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
+    highlighted.push(l);
   });
 
-  lastHighlighted=l;
-  map.fitBounds(l.getBounds().pad(.35));
-};
-
-clearBtn.onclick=()=>clearHighlight(true);
-
-function clearHighlight(reset){
-  if(lastHighlighted){
-    lastHighlighted.setStyle({
-      color:"#ff9800",
-      weight:2,
-      fillColor:"#ffd280",
-      fillOpacity:.35
-    });
-    lastHighlighted=null;
-  }
-  if(reset) map.fitBounds(bounds);
+  map.fitBounds(highlighted[0].getBounds().pad(.35));
 }
 
-/* ================= ADMIN / DRAW / SAVE ================= */
-unlockBtn.onclick=()=>{
-  if(adminPass.value==="NALCO123"){
-    admin=true;
-    adminTools.style.display="block";
-    alert("Admin unlocked");
-  }else alert("Wrong password");
-};
+searchBtn.onclick=()=>doSearch(searchInput.value.trim().toUpperCase());
+resetBtn.onclick=resetAll;
 
-const draw=new L.Control.Draw({
-  draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
-});
+/* ================= AUTOSUGGEST ================= */
+const suggestBox=document.getElementById("suggestBox");
+searchInput.oninput=()=>{
+  const q=searchInput.value.trim().toUpperCase();
+  suggestBox.innerHTML="";
+  if(q.length<3){suggestBox.style.display="none";return;}
 
-toggleDraw.onclick=()=>{
-  if(!admin) return alert("Admin only");
-  editor=!editor;
-  toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
-  editor?map.addControl(draw):map.removeControl(draw);
-};
+  const set=new Set();
+  data.forEach(d=>d.expanded.forEach(b=>{
+    const v=`${d.sector}-${b}`;
+    if(v.startsWith(q)) set.add(v);
+  }));
 
-map.on(L.Draw.Event.CREATED,e=>{
-  if(!editor) return;
-  const range=prompt("Enter range (Example: B-168-179)");
-  if(!range) return;
-
-  const exp=expand(range);
-  if(!exp.length) return alert("Invalid range");
-
-  const b=e.layer.getBounds();
-  data.push({
-    id:"id_"+(++counter),
-    sector:PAGE_SECTOR,
-    rangeText:range.toUpperCase(),
-    expanded:exp,
-    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
-  });
-  render();
-});
-
-downloadJson.onclick=()=>{
-  const blob=new Blob([JSON.stringify({sectors:{1:data}},null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="sector1_ranges.json";
-  a.click();
-};
-
-saveGithub.onclick=async()=>{
-  if(!admin) return;
-  let token=localStorage.getItem("GITHUB_TOKEN")||prompt("Enter GitHub Token");
-  localStorage.setItem("GITHUB_TOKEN",token);
-
-  const body={
-    message:"Update sector-1 map",
-    content:btoa(JSON.stringify({sectors:{1:data}},null,2))
-  };
-
-  const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector1_ranges.json";
-  const r=await fetch(api,{headers:{Authorization:"Bearer "+token}});
-  if(r.ok) body.sha=(await r.json()).sha;
-
-  const res=await fetch(api,{
-    method:"PUT",
-    headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
-    body:JSON.stringify(body)
+  [...set].slice(0,20).forEach(v=>{
+    const d=document.createElement("div");
+    d.className="suggest-item";
+    d.textContent=v;
+    d.onclick=()=>{
+      searchInput.value=v;
+      suggestBox.style.display="none";
+      doSearch(v);
+    };
+    suggestBox.appendChild(d);
   });
 
-  alert(res.ok?"✅ Sector-1 Saved":"❌ Save failed");
+  suggestBox.style.display=set.size?"block":"none";
 };
-
-/* ================= UTIL ================= */
-function expand(s){
-  s=s.replace(/\s/g,"").toUpperCase();
-  const m=s.match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
-  if(!m) return [];
-  const a=+m[2], b=+m[3]||a;
-  const o=[];
-  for(let i=Math.min(a,b);i<=Math.max(a,b);i++) o.push(`${m[1]}-${i}`);
-  return o;
-}
 </script>
 </body>
 </html>
