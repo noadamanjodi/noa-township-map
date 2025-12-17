@@ -15,7 +15,8 @@ header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600
 
 .sidebar{
   width:320px;background:#fff;padding:14px;
-  box-shadow:2px 0 12px rgba(0,0,0,.1)
+  box-shadow:2px 0 12px rgba(0,0,0,.1);
+  position:relative
 }
 input,button{
   width:100%;padding:12px;border-radius:10px;
@@ -64,71 +65,75 @@ input,button{
 /* ================= CONFIG ================= */
 const IMG_W = 4400;
 const IMG_H = 3080;
-const SECTOR2_OFFSET_Y = IMG_H;
 
 /* ================= MAP ================= */
 const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const fullBounds = [
-  map.unproject([0, IMG_H*2],0),
+
+const FULL_BOUNDS = [
+  map.unproject([0, IMG_H * 2],0),
   map.unproject([IMG_W, 0],0)
 ];
 
-/* ================= IMAGES ================= */
-L.imageOverlay("./sector1.png",[
-  map.unproject([0,IMG_H],0),
-  map.unproject([IMG_W,0],0)
+/* ================= IMAGE LAYERS ================= */
+L.imageOverlay("./sector1.png", [
+  map.unproject([0, IMG_H],0),
+  map.unproject([IMG_W, 0],0)
 ]).addTo(map);
 
-L.imageOverlay("./sector2.png",[
-  map.unproject([0,IMG_H*2],0),
-  map.unproject([IMG_W,IMG_H],0)
+L.imageOverlay("./sector2.png", [
+  map.unproject([0, IMG_H * 2],0),
+  map.unproject([IMG_W, IMG_H],0)
 ]).addTo(map);
 
-map.fitBounds(fullBounds);
+map.fitBounds(FULL_BOUNDS);
 
 /* ================= DATA ================= */
-const group1=L.featureGroup().addTo(map);
-const group2=L.featureGroup().addTo(map);
-const layers={1:{},2:{}};
+const layers={};
 let data=[], highlighted=[];
 
 /* ================= LOAD JSON ================= */
 fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/township_blocks.json")
 .then(r=>r.json())
 .then(j=>{
-  data=j.blocks || [];
+  data = j.blocks || [];
   render();
 });
 
 /* ================= RENDER ================= */
-function shiftBounds(bounds,dy){
+function applyMapOffset(bounds, mapNo){
+  if(mapNo !== 2) return bounds;
+
   return [
-    [bounds[0][0]-dy, bounds[0][1]],
-    [bounds[1][0]-dy, bounds[1][1]]
+    [bounds[0][0] - IMG_H, bounds[0][1]],
+    [bounds[1][0] - IMG_H, bounds[1][1]]
   ];
 }
 
 function render(){
   data.forEach(b=>{
-    const shifted =
-      b.sector===2 ? shiftBounds(b.boundsLatLng, SECTOR2_OFFSET_Y) : b.boundsLatLng;
+    const finalBounds = applyMapOffset(b.boundsLatLng, b.map);
 
-    const rect=L.rectangle(shifted,{
-      color:b.sector===1?"#1976d2":"#c62828",
-      weight:2,fillOpacity:.35
-    }).bindTooltip(`Sector-${b.sector}: ${b.rangeText}`);
+    const rect = L.rectangle(finalBounds,{
+      color: b.sector === 1 ? "#1976d2" : "#c62828",
+      weight:2,
+      fillOpacity:.35
+    }).bindTooltip(`Sector-${b.sector} | ${b.rangeText}`);
 
-    (b.sector===1?group1:group2).addLayer(rect);
-    layers[b.sector][b.id]=rect;
+    rect.addTo(map);
+    layers[b.id] = rect;
   });
 }
 
 /* ================= RESET ================= */
 function resetAll(){
-  highlighted.forEach(l=>l.setStyle({weight:2,fillOpacity:.35,color:l.options.color}));
+  highlighted.forEach(l=>l.setStyle({
+    weight:2,
+    fillOpacity:.35,
+    color:l.options.color
+  }));
   highlighted=[];
   searchInput.value="";
-  map.fitBounds(fullBounds);
+  map.fitBounds(FULL_BOUNDS);
 }
 
 /* ================= SEARCH ================= */
@@ -136,16 +141,17 @@ function doSearch(v){
   resetAll();
   const m=v.match(/^([12])\-([A-Z]\-\d+)$/);
   if(!m){alert("Use format 1-B-720");return;}
-  const sector=+m[1], q=m[2];
 
+  const sector=+m[1], q=m[2];
   const found=data.filter(d=>d.sector===sector && d.expanded.includes(q));
   if(!found.length){alert("Not found");return;}
 
   found.forEach(b=>{
-    const l=layers[sector][b.id];
+    const l=layers[b.id];
     l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
     highlighted.push(l);
   });
+
   map.fitBounds(highlighted[0].getBounds().pad(.35));
 }
 
@@ -172,6 +178,7 @@ searchInput.oninput=()=>{
     d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";doSearch(v)};
     suggestBox.appendChild(d);
   });
+
   suggestBox.style.display=set.size?"block":"none";
 };
 </script>
