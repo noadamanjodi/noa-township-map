@@ -303,6 +303,7 @@
       {
         "id": "id_12",
         "sector": 2,
+        "map": 2,
         "rangeText": "B-385-396",
         "expanded": [
           "B-385",
