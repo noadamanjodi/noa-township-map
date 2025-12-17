@@ -2730,7 +2730,7 @@
       },
       {
         "id": "id_98",
-        "sector": 2,
+        "sector": 1,
         "rangeText": "A-73-80",
         "expanded": [
           "A-73",
@@ -3146,7 +3146,7 @@
       },
       {
         "id": "id_114",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "A-73-80",
         "expanded": [
           "A-73",
