@@ -30,10 +30,11 @@ header{
   width:320px;
   background:#fff;
   padding:14px;
-  box-shadow:2px 0 12px rgba(0,0,0,.1)
+  box-shadow:2px 0 12px rgba(0,0,0,.1);
+  position:relative;
 }
 .panel{margin-bottom:16px}
-input,button{
+input,select,button{
   width:100%;
   padding:12px;
   border-radius:10px;
@@ -47,13 +48,28 @@ button{
   background:#ffd24d;
   border:none
 }
-.toggle label{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:15px;
-  margin-top:6px
+
+/* AUTOSUGGEST */
+.suggest-box{
+  position:absolute;
+  top:175px;
+  left:14px;
+  right:14px;
+  background:#fff;
+  border-radius:10px;
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+  z-index:2000;
+  max-height:220px;
+  overflow:auto;
+  display:none;
 }
+.suggest-item{
+  padding:10px 12px;
+  cursor:pointer;
+  font-size:15px;
+  border-bottom:1px solid #eee;
+}
+.suggest-item:hover{background:#eef4ff}
 
 /* MAP */
 .map-wrap{flex:1}
@@ -76,18 +92,21 @@ button{
 
 <aside class="sidebar">
 
+  <!-- SECTOR SELECT -->
+  <div class="panel">
+    <strong>Select Sector</strong>
+    <select id="sectorSelect">
+      <option value="1">Sector-1</option>
+      <option value="2">Sector-2</option>
+    </select>
+  </div>
+
   <!-- SEARCH -->
   <div class="panel">
     <strong>Search Quarter</strong>
-    <input id="searchInput" placeholder="Example: 1-B-168 or 2-B-168">
+    <input id="searchInput" placeholder="Example: B-168" autocomplete="off">
     <button id="searchBtn">🔍 Find</button>
-  </div>
-
-  <!-- TOGGLES -->
-  <div class="panel toggle">
-    <strong>Show / Hide Sectors</strong>
-    <label><input type="checkbox" id="chk1" checked> Sector-1</label>
-    <label><input type="checkbox" id="chk2" checked> Sector-2</label>
+    <div id="suggestBox" class="suggest-box"></div>
   </div>
 
 </aside>
@@ -113,15 +132,14 @@ const bounds = [
 ];
 
 /* ================= IMAGE OVERLAYS ================= */
-const overlay1 = L.imageOverlay("./sector1.png", bounds).addTo(map);
-const overlay2 = L.imageOverlay("./sector2.png", bounds).addTo(map);
-map.fitBounds(bounds);
+const overlay1 = L.imageOverlay("./sector1.png", bounds);
+const overlay2 = L.imageOverlay("./sector2.png", bounds);
 
 /* ================= GROUPS ================= */
-const group1 = L.featureGroup().addTo(map);
-const group2 = L.featureGroup().addTo(map);
+const group1 = L.featureGroup();
+const group2 = L.featureGroup();
 
-const layers = {1:{}, 2:{}};
+const layers = {1:{},2:{}};
 let data = [];
 
 /* ================= LOAD JSONs ================= */
@@ -134,21 +152,17 @@ Promise.all([
     ...(s2.sectors?.[2] || [])
   ];
   render();
+  switchSector(1); // default
 });
 
 /* ================= RENDER ================= */
 function render(){
-  group1.clearLayers();
-  group2.clearLayers();
-
   data.forEach(b=>{
     const rect = L.rectangle(b.boundsLatLng,{
       color: b.sector===1 ? "#1976d2" : "#c62828",
       weight:2,
       fillOpacity:0.35
-    });
-
-    rect.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
+    }).bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
 
     if(b.sector===1){
       rect.addTo(group1);
@@ -160,43 +174,88 @@ function render(){
   });
 }
 
-/* ================= SEARCH (CORRECT) ================= */
-searchBtn.onclick=()=>{
-  const raw = searchInput.value.trim().toUpperCase();
-  const m = raw.match(/^([12])-(.+)$/);
+/* ================= SECTOR SWITCH ================= */
+function switchSector(sec){
+  map.eachLayer(l=>{
+    if(l!==map) map.removeLayer(l);
+  });
 
-  if(!m){
-    alert("Use format: 1-B-168 or 2-B-168");
-    return;
+  if(sec==1){
+    overlay1.addTo(map);
+    group1.addTo(map);
+  }else{
+    overlay2.addTo(map);
+    group2.addTo(map);
   }
+  map.fitBounds(bounds);
+}
 
-  const sector = parseInt(m[1],10);
-  const quarter = m[2];
+sectorSelect.onchange=()=>{
+  switchSector(parseInt(sectorSelect.value,10));
+  searchInput.value="";
+  suggestBox.style.display="none";
+};
 
+/* ================= SEARCH ================= */
+function doSearch(quarter){
+  const sector = parseInt(sectorSelect.value,10);
   const found = data.find(d =>
-    d.sector === sector &&
-    d.expanded.includes(quarter)
+    d.sector===sector && d.expanded.includes(quarter)
   );
-
   if(!found){
-    alert("Block not found");
+    alert("Block not found in selected sector");
+    return;
+  }
+  map.fitBounds(layers[sector][found.id].getBounds().pad(0.35));
+}
+
+searchBtn.onclick=()=>{
+  const q = searchInput.value.trim().toUpperCase();
+  if(!q) return;
+  doSearch(q);
+};
+
+/* ================= AUTO-SUGGEST ================= */
+const suggestBox = document.getElementById("suggestBox");
+
+searchInput.oninput=()=>{
+  const q = searchInput.value.trim().toUpperCase();
+  suggestBox.innerHTML="";
+  if(q.length<2){
+    suggestBox.style.display="none";
     return;
   }
 
-  const layer = layers[sector][found.id];
-  map.fitBounds(layer.getBounds().pad(0.35));
+  const sector = parseInt(sectorSelect.value,10);
+  const matches = [];
+
+  data.forEach(d=>{
+    if(d.sector!==sector) return;
+    d.expanded.forEach(b=>{
+      if(b.startsWith(q)) matches.push(b);
+    });
+  });
+
+  [...new Set(matches)].slice(0,20).forEach(b=>{
+    const div=document.createElement("div");
+    div.className="suggest-item";
+    div.textContent=b;
+    div.onclick=()=>{
+      searchInput.value=b;
+      suggestBox.style.display="none";
+      doSearch(b);
+    };
+    suggestBox.appendChild(div);
+  });
+
+  suggestBox.style.display = matches.length ? "block" : "none";
 };
 
-/* ================= TOGGLES ================= */
-chk1.onchange=()=>{
-  chk1.checked ? map.addLayer(group1) : map.removeLayer(group1);
-  chk1.checked ? map.addLayer(overlay1) : map.removeLayer(overlay1);
-};
-
-chk2.onchange=()=>{
-  chk2.checked ? map.addLayer(group2) : map.removeLayer(group2);
-  chk2.checked ? map.addLayer(overlay2) : map.removeLayer(overlay2);
-};
+document.addEventListener("click",e=>{
+  if(!suggestBox.contains(e.target) && e.target!==searchInput){
+    suggestBox.style.display="none";
+  }
+});
 </script>
 </body>
 </html>
