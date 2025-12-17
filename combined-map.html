@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <title>Township Combined Map – Sector 1 & 2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
@@ -16,23 +15,26 @@ header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600
 .sidebar{
   width:320px;background:#fff;padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.1);
-  position:relative
 }
+.panel{margin-bottom:16px}
 input,button{
   width:100%;padding:12px;border-radius:10px;
   border:1px solid #ccc;margin-top:8px;font-size:15px
 }
-.find{background:#ffd24d;font-weight:600;border:none;cursor:pointer}
-.reset{background:#e0e0e0;font-weight:600;border:none;cursor:pointer}
+button{cursor:pointer;font-weight:600;background:#ffd24d;border:none}
+.reset{background:#e0e0e0}
 
-.suggest-box{
-  position:absolute;left:14px;right:14px;top:150px;
-  background:#fff;border-radius:10px;
-  box-shadow:0 6px 18px rgba(0,0,0,.15);
-  max-height:220px;overflow:auto;display:none;z-index:999
+/* INLINE ERROR */
+#errorMsg{
+  display:none;
+  margin-top:10px;
+  padding:10px;
+  border-radius:8px;
+  font-size:14px;
+  background:#ffe5e5;
+  color:#b00020;
+  font-weight:600;
 }
-.suggest-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
-.suggest-item:hover{background:#eef4ff}
 
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
@@ -45,141 +47,117 @@ input,button{
 <header>Township Map – Sector 1 (Top) & Sector 2 (Bottom)</header>
 
 <div class="content">
+
 <aside class="sidebar">
-  <strong>Search Quarter</strong>
-  <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
-  <button id="searchBtn" class="find">🔍 Find</button>
-  <button id="resetBtn" class="reset">🔄 Reset</button>
-  <div id="suggestBox" class="suggest-box"></div>
+  <div class="panel">
+    <strong>Search Quarter</strong>
+    <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
+    <button id="searchBtn">🔍 Find</button>
+    <button id="resetBtn" class="reset">🔄 Reset</button>
+    <div id="errorMsg"></div>
+  </div>
 </aside>
 
 <div class="map-wrap">
   <div id="map"></div>
 </div>
+
 </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-/* ================= CONFIG ================= */
-const IMG_W = 4400;
-const IMG_H = 3080;
-
 /* ================= MAP ================= */
-const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const IMG_W=4400, IMG_H=3080;
+const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
 
-const FULL_BOUNDS = [
-  map.unproject([0, IMG_H * 2],0),
-  map.unproject([IMG_W, 0],0)
-];
-
-/* ================= IMAGE LAYERS ================= */
-L.imageOverlay("./sector1.png", [
-  map.unproject([0, IMG_H],0),
-  map.unproject([IMG_W, 0],0)
-]).addTo(map);
-
-L.imageOverlay("./sector2.png", [
-  map.unproject([0, IMG_H * 2],0),
-  map.unproject([IMG_W, IMG_H],0)
-]).addTo(map);
-
-map.fitBounds(FULL_BOUNDS);
+L.imageOverlay("./sector2.png",bounds).addTo(map);
+L.imageOverlay("./sector1.png",bounds).addTo(map);
+map.fitBounds(bounds);
 
 /* ================= DATA ================= */
+const group=L.featureGroup().addTo(map);
 const layers={};
-let data=[], highlighted=[];
+let data=[], lastHighlight=null;
+
+const errorMsg=document.getElementById("errorMsg");
 
 /* ================= LOAD JSON ================= */
 fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/township_blocks.json")
 .then(r=>r.json())
 .then(j=>{
-  data = j.blocks || [];
-  render();
-});
-
-/* ================= RENDER ================= */
-function applyMapOffset(bounds, mapNo){
-  if(mapNo !== 2) return bounds;
-
-  return [
-    [bounds[0][0] - IMG_H, bounds[0][1]],
-    [bounds[1][0] - IMG_H, bounds[1][1]]
-  ];
-}
-
-function render(){
+  data=j.blocks||[];
   data.forEach(b=>{
-    const finalBounds = applyMapOffset(b.boundsLatLng, b.map);
-
-    const rect = L.rectangle(finalBounds,{
-      color: b.sector === 1 ? "#1976d2" : "#c62828",
+    const rect=L.rectangle(b.boundsLatLng,{
+      color:b.sector===1?"#1976d2":"#c62828",
       weight:2,
       fillOpacity:.35
-    }).bindTooltip(`Sector-${b.sector} | ${b.rangeText}`);
-
-    rect.addTo(map);
-    layers[b.id] = rect;
+    }).bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true})
+      .addTo(group);
+    layers[b.id]=rect;
   });
+});
+
+/* ================= UTIL ================= */
+function showError(msg){
+  errorMsg.innerText=msg;
+  errorMsg.style.display="block";
+}
+function clearError(){
+  errorMsg.style.display="none";
 }
 
-/* ================= RESET ================= */
-function resetAll(){
-  highlighted.forEach(l=>l.setStyle({
-    weight:2,
-    fillOpacity:.35,
-    color:l.options.color
-  }));
-  highlighted=[];
-  searchInput.value="";
-  map.fitBounds(FULL_BOUNDS);
+function clearHighlight(){
+  if(lastHighlight){
+    const s=lastHighlight.options.sector;
+    lastHighlight.setStyle({
+      color:s===1?"#1976d2":"#c62828",
+      weight:2,
+      fillOpacity:.35
+    });
+    lastHighlight=null;
+  }
 }
 
 /* ================= SEARCH ================= */
 function doSearch(v){
-  resetAll();
-  const m=v.match(/^([12])\-([A-Z]\-\d+)$/);
-  if(!m){alert("Use format 1-B-720");return;}
+  clearError();
+  const m=v.match(/^([12])-(.+)$/);
+  if(!m){ showError("❌ Use format like 1-B-720 or 2-B-168"); return; }
 
   const sector=+m[1], q=m[2];
-  const found=data.filter(d=>d.sector===sector && d.expanded.includes(q));
-  if(!found.length){alert("Not found");return;}
+  const found=data.find(d=>d.sector===sector && d.expanded.includes(q));
 
-  found.forEach(b=>{
-    const l=layers[b.id];
-    l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
-    highlighted.push(l);
+  if(!found){
+    showError(`❌ ${q} not found in Sector-${sector}`);
+    return;
+  }
+
+  clearHighlight();
+  const layer=layers[found.id];
+  layer.options.sector=sector;
+  layer.setStyle({
+    color:"#2e7d32",
+    weight:4,
+    fillOpacity:.6
   });
-
-  map.fitBounds(highlighted[0].getBounds().pad(.35));
+  lastHighlight=layer;
+  map.fitBounds(layer.getBounds().pad(.35));
 }
 
-searchBtn.onclick=()=>doSearch(searchInput.value.trim().toUpperCase());
-resetBtn.onclick=resetAll;
+searchBtn.onclick=()=>{
+  const v=searchInput.value.trim().toUpperCase();
+  if(v) doSearch(v);
+};
 
-/* ================= AUTOSUGGEST ================= */
-const suggestBox=document.getElementById("suggestBox");
-searchInput.oninput=()=>{
-  const q=searchInput.value.trim().toUpperCase();
-  suggestBox.innerHTML="";
-  if(q.length<3){suggestBox.style.display="none";return;}
-
-  const set=new Set();
-  data.forEach(d=>d.expanded.forEach(b=>{
-    const v=`${d.sector}-${b}`;
-    if(v.startsWith(q)) set.add(v);
-  }));
-
-  [...set].slice(0,20).forEach(v=>{
-    const d=document.createElement("div");
-    d.className="suggest-item";
-    d.textContent=v;
-    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";doSearch(v)};
-    suggestBox.appendChild(d);
-  });
-
-  suggestBox.style.display=set.size?"block":"none";
+/* ================= RESET ================= */
+resetBtn.onclick=()=>{
+  searchInput.value="";
+  clearError();
+  clearHighlight();
+  map.fitBounds(bounds);
 };
 </script>
 </body>
