@@ -34,7 +34,7 @@ input,button{
 .suggest-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
 .suggest-item:hover{background:#eef4ff}
 
-/* INLINE ERROR (ADDED) */
+/* INLINE ERROR */
 #errorMsg{
   display:none;
   margin-top:10px;
@@ -49,6 +49,55 @@ input,button{
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
+
+/* ============================
+   MOBILE FRIENDLY PATCH
+   (ONLY CSS – NO LOGIC CHANGE)
+============================ */
+@media (max-width: 768px){
+
+  .content{
+    flex-direction:column;
+  }
+
+  .sidebar{
+    width:100%;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+    border-radius:0 0 16px 16px;
+  }
+
+  header{
+    font-size:16px;
+    padding:10px;
+  }
+
+  input{
+    font-size:16px; /* prevent mobile zoom */
+  }
+
+  button{
+    padding:14px;
+    font-size:16px;
+  }
+
+  .suggest-box{
+    left:10px;
+    right:10px;
+    top:auto;
+    margin-top:6px;
+    max-height:180px;
+  }
+
+  .map-wrap{
+    flex:1;
+    min-height:55vh;
+  }
+}
+
+/* LARGE SCREENS */
+@media (min-width: 1200px){
+  .sidebar{width:340px}
+}
 </style>
 </head>
 
@@ -62,10 +111,7 @@ input,button{
   <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
   <button id="searchBtn" class="find">🔍 Find</button>
   <button id="resetBtn" class="reset">🔄 Reset</button>
-
-  <!-- ERROR MESSAGE (ADDED) -->
   <div id="errorMsg"></div>
-
   <div id="suggestBox" class="suggest-box"></div>
 </aside>
 
@@ -107,16 +153,10 @@ map.fitBounds(FULL_BOUNDS);
 const layers={};
 let data=[], highlighted=[];
 
-/* ================= ERROR HELPERS (ADDED) ================= */
+/* ================= ERROR HELPERS ================= */
 const errorMsg=document.getElementById("errorMsg");
-
-function showError(msg){
-  errorMsg.innerText=msg;
-  errorMsg.style.display="block";
-}
-function clearError(){
-  errorMsg.style.display="none";
-}
+function showError(msg){errorMsg.innerText=msg;errorMsg.style.display="block";}
+function clearError(){errorMsg.style.display="none";}
 
 /* ================= LOAD JSON ================= */
 fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/township_blocks.json")
@@ -154,31 +194,23 @@ function resetAll(){
   highlighted.forEach(l=>l.setStyle({
     weight:2,
     fillOpacity:.35,
-    color: l.options.originalColor
+    color:l.options.originalColor
   }));
   highlighted=[];
   searchInput.value="";
-  clearError();              /* ADDED */
+  clearError();
   map.fitBounds(FULL_BOUNDS);
 }
 
 /* ================= SEARCH ================= */
 function doSearch(v){
   resetAll();
-
   const m=v.match(/^([12])\-([A-Z]\-\d+)$/);
-  if(!m){
-    showError("❌ Use format 1-B-720 or 2-B-168");
-    return;
-  }
+  if(!m){showError("❌ Use format 1-B-720 or 2-B-168");return;}
 
   const sector=+m[1], q=m[2];
   const found=data.filter(d=>d.sector===sector && d.expanded.includes(q));
-
-  if(!found.length){
-    showError("❌ Quarter not found");
-    return;
-  }
+  if(!found.length){showError("❌ Quarter not found");return;}
 
   found.forEach(b=>{
     const l=layers[b.id];
@@ -209,11 +241,7 @@ searchInput.oninput=()=>{
     const d=document.createElement("div");
     d.className="suggest-item";
     d.textContent=v;
-    d.onclick=()=>{
-      searchInput.value=v;
-      suggestBox.style.display="none";
-      doSearch(v);
-    };
+    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";doSearch(v)};
     suggestBox.appendChild(d);
   });
 
