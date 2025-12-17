@@ -3,7 +3,7 @@
     "1": [
       {
         "id": "id_1",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-529-540",
         "expanded": [
           "B-529",
@@ -32,7 +32,7 @@
       },
       {
         "id": "id_2",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-589-600",
         "expanded": [
           "B-589",
@@ -61,7 +61,7 @@
       },
       {
         "id": "id_3",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-541-564",
         "expanded": [
           "B-541",
@@ -102,7 +102,7 @@
       },
       {
         "id": "id_4",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-565-588",
         "expanded": [
           "B-565",
@@ -143,7 +143,7 @@
       },
       {
         "id": "id_5",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-617-628",
         "expanded": [
           "B-617",
@@ -172,7 +172,7 @@
       },
       {
         "id": "id_6",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-601-608",
         "expanded": [
           "B-601",
@@ -197,7 +197,7 @@
       },
       {
         "id": "id_7",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-609-616",
         "expanded": [
           "B-609",
@@ -222,7 +222,7 @@
       },
       {
         "id": "id_8",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-629-636",
         "expanded": [
           "B-629",
@@ -247,7 +247,7 @@
       },
       {
         "id": "id_9",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-641-656",
         "expanded": [
           "B-641",
@@ -280,7 +280,7 @@
       },
       {
         "id": "id_10",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-657-672",
         "expanded": [
           "B-657",
@@ -313,7 +313,7 @@
       },
       {
         "id": "id_11",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-673-688",
         "expanded": [
           "B-673",
@@ -346,7 +346,7 @@
       },
       {
         "id": "id_12",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-689-704",
         "expanded": [
           "B-689",
@@ -379,7 +379,7 @@
       },
       {
         "id": "id_13",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-705-716",
         "expanded": [
           "B-705",
@@ -408,7 +408,7 @@
       },
       {
         "id": "id_14",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-505-528",
         "expanded": [
           "B-505",
@@ -449,7 +449,7 @@
       },
       {
         "id": "id_15",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "B-477-504",
         "expanded": [
           "B-477",
