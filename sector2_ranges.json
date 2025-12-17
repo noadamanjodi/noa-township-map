@@ -2630,7 +2630,7 @@
       },
       {
         "id": "id_94",
-        "sector": 2,
+        "sector": 1,
         "rangeText": "A-2-9",
         "expanded": [
           "A-2",
@@ -2655,7 +2655,7 @@
       },
       {
         "id": "id_95",
-        "sector": 2,
+        "sector": 1,
         "rangeText": "A-25-32",
         "expanded": [
           "A-25",
@@ -2705,7 +2705,7 @@
       },
       {
         "id": "id_97",
-        "sector": 2,
+        "sector": 1,
         "rangeText": "A-33-40",
         "expanded": [
           "A-33",
@@ -2730,7 +2730,7 @@
       },
       {
         "id": "id_98",
-        "sector": 1,
+        "sector": 2,
         "rangeText": "A-73-80",
         "expanded": [
           "A-73",
