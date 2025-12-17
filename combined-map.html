@@ -68,7 +68,7 @@ button{
 }
 .suggest-item:hover{background:#eef4ff}
 
-/* Admin hidden completely */
+/* Admin fully hidden */
 #adminSection{display:none}
 
 @media(max-width:768px){
@@ -85,7 +85,6 @@ button{
 <div class="content">
 
 <aside class="sidebar">
-
 <div class="panel">
   <strong>Search Quarter (Format: 1-B-720)</strong>
   <input id="searchInput" placeholder="1-B-720">
@@ -94,16 +93,6 @@ button{
   <div id="msgBox"></div>
   <div id="suggestBox" class="suggest-box"></div>
 </div>
-
-<!-- Admin exists but hidden -->
-<div id="adminSection">
-  <input id="adminPass" type="password">
-  <button id="unlockBtn"></button>
-  <button id="toggleDraw"></button>
-  <button id="exportBtn"></button>
-  <button id="saveGithub"></button>
-</div>
-
 </aside>
 
 <div class="map-wrap">
@@ -169,7 +158,7 @@ function render(){
   layers={};
   data.forEach(b=>{
     const r=L.rectangle(shift(b.boundsLatLng,b.map),{
-      color:b.sector===1?"#1976d2":"#c62828",
+      color:b.map===1?"#1976d2":"#c62828",
       weight:2,
       fillOpacity:.35
     }).addTo(group);
@@ -177,21 +166,36 @@ function render(){
   });
 }
 
-/* ================= SEARCH ================= */
+/* ================= SEARCH (FIXED) ================= */
 searchBtn.onclick=()=>{
   clearMsg();
-  const m=searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
-  if(!m){showMsg("Use format 1-B-720 or 2-B-720");return}
 
-  const s=+m[1], q=m[2];
-  const f=data.find(d=>d.sector===s && d.expanded.includes(q));
-  if(!f){showMsg("Quarter not found");return}
+  const m=searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
+  if(!m){
+    showMsg("Use format: 1-B-720 or 2-B-720");
+    return;
+  }
+
+  const sector=+m[1];
+  const quarter=m[2];
+
+  const found=data.find(d =>
+    d.sector===sector &&
+    d.map===sector &&       // 🔑 CRITICAL FIX
+    d.expanded.includes(quarter)
+  );
+
+  if(!found){
+    showMsg("Quarter not available in this sector");
+    return;
+  }
 
   if(last) last.setStyle({weight:2,fillOpacity:.35});
-  const l=layers[f.id];
-  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
-  last=l;
-  map.fitBounds(l.getBounds().pad(.35));
+
+  const layer=layers[found.id];
+  layer.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
+  last=layer;
+  map.fitBounds(layer.getBounds().pad(.35));
 };
 
 /* ================= RESET ================= */
@@ -203,10 +207,9 @@ resetBtn.onclick=()=>{
   map.fitBounds(fullBounds);
 };
 
-/* ================= AUTOSUGGEST + AUTO-UPPERCASE ================= */
+/* ================= AUTOSUGGEST + AUTO UPPERCASE ================= */
 searchInput.oninput=()=>{
-  // 🔤 AUTO UPPERCASE (NEW)
-  searchInput.value = searchInput.value.toUpperCase();
+  searchInput.value=searchInput.value.toUpperCase();
 
   const q=searchInput.value;
   suggestBox.innerHTML="";
