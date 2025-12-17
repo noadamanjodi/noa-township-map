@@ -27,13 +27,12 @@ input,button{
 button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 .admin{background:#b6e57a}
 .save{background:#9fd0ff}
-.clear{background:#e0e7ff;color:#003f88}
+.reset{background:#e0e7ff;color:#003f88}
 
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
 
-/* Autosuggest */
 .suggest-box{
   background:#fff;border-radius:10px;
   box-shadow:0 6px 18px rgba(0,0,0,.2);
@@ -64,6 +63,7 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
   <strong>Search Quarter</strong>
   <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168">
   <button id="searchBtn">🔍 Find</button>
+  <button class="reset" id="resetBtn">🔄 Reset Highlight</button>
   <div id="suggestBox" class="suggest-box"></div>
 </div>
 
@@ -103,13 +103,17 @@ const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
 const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
 const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
 
+const fullBounds=[
+  map.unproject([0,IMG_H*2],0),
+  map.unproject([IMG_W,0],0)
+];
+
 L.imageOverlay(IMG1,bounds1).addTo(map);
 L.imageOverlay(IMG2,bounds2).addTo(map);
-
-map.fitBounds([map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)]);
+map.fitBounds(fullBounds);
 
 /* ================= DATA ================= */
-let data=[], layers={}, last=null, selected=null;
+let data=[], layers={}, lastHighlighted=null, selected=null;
 const group=L.featureGroup().addTo(map);
 
 /* ================= AUTO-MIGRATE ================= */
@@ -145,21 +149,38 @@ function render(){
   layers={};
 
   data.forEach(b=>{
-    const r=L.rectangle(
+    const rect=L.rectangle(
       shift(b.boundsLatLng,b.map),
-      {color:b.sector===1?"#1976d2":"#c62828",weight:2,fillOpacity:.35}
+      {
+        color:b.sector===1?"#1976d2":"#c62828",
+        weight:2,
+        fillOpacity:.35
+      }
     ).addTo(group);
 
-    r.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
+    rect.bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true});
 
-    r.on("click",()=>{
+    rect.on("click",()=>{
       selected=b;
       navigator.clipboard.writeText(`${b.sector}-${b.expanded[0]}`);
     });
 
-    layers[b.id]=r;
+    layers[b.id]=rect;
   });
 }
+
+/* ================= RESET ================= */
+resetBtn.onclick=()=>{
+  if(lastHighlighted){
+    lastHighlighted.setStyle({
+      color:lastHighlighted.options.originalColor,
+      weight:2,
+      fillOpacity:.35
+    });
+    lastHighlighted=null;
+  }
+  map.fitBounds(fullBounds);
+};
 
 /* ================= SEARCH ================= */
 searchBtn.onclick=()=>{
@@ -170,10 +191,24 @@ searchBtn.onclick=()=>{
   const f=data.find(d=>d.sector===s&&d.expanded.includes(q));
   if(!f) return alert("Not found");
 
-  if(last) last.setStyle({weight:2,fillOpacity:.35});
+  if(lastHighlighted){
+    lastHighlighted.setStyle({
+      color:lastHighlighted.options.originalColor,
+      weight:2,
+      fillOpacity:.35
+    });
+  }
+
   const l=layers[f.id];
-  l.setStyle({weight:4,fillOpacity:.6,color:"#2e7d32"});
-  last=l;
+  l.options.originalColor=l.options.color;
+
+  l.setStyle({
+    color:"#2e7d32",
+    weight:4,
+    fillOpacity:.6
+  });
+
+  lastHighlighted=l;
   map.fitBounds(l.getBounds().pad(.35));
 };
 
@@ -193,7 +228,11 @@ searchInput.oninput=()=>{
     const d=document.createElement("div");
     d.className="suggest-item";
     d.textContent=v;
-    d.onclick=()=>{searchInput.value=v;suggestBox.style.display="none";searchBtn.onclick();}
+    d.onclick=()=>{
+      searchInput.value=v;
+      suggestBox.style.display="none";
+      searchBtn.onclick();
+    };
     suggestBox.appendChild(d);
   });
   suggestBox.style.display=out.length?"block":"none";
@@ -227,13 +266,13 @@ map.on(L.Draw.Event.CREATED,e=>{
   const sector=+prompt("Sector (1 or 2)");
   const mapNo=+prompt("Map image (1=Top, 2=Bottom)");
   const range=prompt("Range (B-145-160)");
-
   if(!sector||!mapNo||!range) return;
 
   const b=e.layer.getBounds();
   data.push({
     id:"id_"+Date.now(),
-    sector, map:mapNo,
+    sector,
+    map:mapNo,
     rangeText:range.toUpperCase(),
     expanded:expand(range),
     boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
@@ -243,7 +282,7 @@ map.on(L.Draw.Event.CREATED,e=>{
 
 /* ================= EXPORT ================= */
 exportBtn.onclick=()=>{
-  if(!selected) return alert("Select a block");
+  if(!selected) return alert("Select a block first");
   const blob=new Blob([JSON.stringify(selected,null,2)],{type:"application/json"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
@@ -257,7 +296,7 @@ saveGithub.onclick=async()=>{
 
   let token=localStorage.getItem("GITHUB_TOKEN");
   if(!token){
-    token=prompt("Enter GitHub Token (repo access)");
+    token=prompt("Enter GitHub Token");
     if(!token) return;
     localStorage.setItem("GITHUB_TOKEN",token);
   }
