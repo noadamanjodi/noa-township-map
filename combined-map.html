@@ -11,57 +11,40 @@
 html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
 .app{height:100%;display:flex;flex-direction:column}
 header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600;text-align:center}
-.content{flex:1;display:flex;min-height:0}
+.content{flex:1;display:flex}
 
 .sidebar{
   width:330px;background:#fff;padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.15);
   overflow:auto
 }
-.panel{margin-bottom:14px}
-
 input,button{
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid #ccc;
-  margin-top:8px;
-  font-size:15px
+  width:100%;padding:12px;border-radius:10px;
+  border:1px solid #ccc;margin-top:8px;font-size:15px
 }
-button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
+button{background:#ffd24d;font-weight:600;border:none;cursor:pointer}
 .reset{background:#e0e7ff;color:#003f88}
 
 #msgBox{
-  display:none;
-  margin-top:10px;
-  padding:10px;
-  border-radius:8px;
-  font-size:14px;
-  font-weight:600;
-  background:#ffe4e4;
-  color:#b00020
+  display:none;margin-top:10px;padding:10px;
+  border-radius:8px;font-weight:600;
+  background:#ffe4e4;color:#b00020
 }
 
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
-.leaflet-image-layer{pointer-events:none}
 
-/* autosuggest */
 .suggest-box{
   background:#fff;border-radius:10px;
   box-shadow:0 6px 18px rgba(0,0,0,.2);
   display:none;max-height:220px;overflow:auto
 }
 .suggest-item{
-  padding:10px;border-bottom:1px solid #eee;
-  cursor:pointer
+  padding:10px;border-bottom:1px solid #eee;cursor:pointer
 }
 .suggest-item:hover{background:#eef4ff}
 
-@media(max-width:768px){
-  .content{flex-direction:column}
-  .sidebar{width:100%}
-}
+#adminSection{display:none}
 </style>
 </head>
 
@@ -70,22 +53,21 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 <header>Township Combined Map – Sector 1 & 2</header>
 
 <div class="content">
-
 <aside class="sidebar">
-  <div class="panel">
-    <strong>Search Quarter (Format: 1-B-720)</strong>
-    <input id="searchInput" placeholder="1-B-720">
-    <button id="searchBtn">Find</button>
-    <button class="reset" id="resetBtn">Reset</button>
-    <div id="msgBox"></div>
-    <div id="suggestBox" class="suggest-box"></div>
-  </div>
+
+<strong>Search Quarter (Format: 1-B-66)</strong>
+<input id="searchInput" placeholder="1-B-66">
+<button id="searchBtn">Find</button>
+<button class="reset" id="resetBtn">Reset</button>
+
+<div id="msgBox"></div>
+<div id="suggestBox" class="suggest-box"></div>
+
 </aside>
 
 <div class="map-wrap">
   <div id="map"></div>
 </div>
-
 </div>
 </div>
 
@@ -94,129 +76,134 @@ button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 <script>
 /* ================= CONFIG ================= */
 const IMG_W = 4400, IMG_H = 3080;
-const IMG1 = "./sector1.png"; // top
-const IMG2 = "./sector2.png"; // bottom
+const IMG1 = "./sector1.png";
+const IMG2 = "./sector2.png";
 
-const JSON1 = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
-const JSON2 = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
+const JSON1 = "sector1_ranges.json";
+const JSON2 = "sector2_ranges.json";
 
 /* ================= MAP ================= */
 const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
 const bounds1 = [map.unproject([0,IMG_H],0), map.unproject([IMG_W,0],0)];
 const bounds2 = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,IMG_H],0)];
-const fullBounds = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,0],0)];
+const fullBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
 
 L.imageOverlay(IMG1,bounds1).addTo(map);
 L.imageOverlay(IMG2,bounds2).addTo(map);
 map.fitBounds(fullBounds);
 
-/* ================= STATE ================= */
-let data = [], layers = {}, last = null;
 const group = L.featureGroup().addTo(map);
 
-/* ================= MESSAGE ================= */
-const msgBox = document.getElementById("msgBox");
+/* ================= STATE ================= */
+let data=[], layers={}, last=null;
+
+/* ================= HELPERS ================= */
+const msgBox=document.getElementById("msgBox");
 function showMsg(t){msgBox.innerText=t;msgBox.style.display="block"}
 function clearMsg(){msgBox.style.display="none"}
 
-/* ================= LOAD DATA ================= */
-Promise.all([
-  fetch(JSON1).then(r=>r.json()),
-  fetch(JSON2).then(r=>r.json())
-]).then(([j1,j2])=>{
-  data = [
-    ...(j1.sectors?.[1]||[]),
-    ...(j2.sectors?.[2]||[])
-  ];
-  render();
-});
-
-/* ================= SHIFT ================= */
 function shift(b,mapNo){
   return mapNo===2
     ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
     : b;
 }
 
+/* ================= LOAD JSON ================= */
+Promise.all([
+  fetch(JSON1).then(r=>r.json()),
+  fetch(JSON2).then(r=>r.json())
+]).then(([j1,j2])=>{
+  data = [
+    ...(j1.sectors["1"]||[]),
+    ...(j2.sectors["2"]||[])
+  ];
+  render();
+});
+
 /* ================= RENDER ================= */
 function render(){
   group.clearLayers();
-  layers = {};
+  layers={};
   data.forEach(b=>{
-    const r = L.rectangle(
-      shift(b.boundsLatLng, b.map),
-      {
-        color: b.map===1 ? "#1976d2" : "#c62828",
-        weight: 2,
-        fillOpacity: .35
-      }
-    ).addTo(group);
-    layers[b.id] = r;
+    const r = L.rectangle(shift(b.boundsLatLng,b.map),{
+      color:b.sector===1?"#1976d2":"#c62828",
+      weight:2,fillOpacity:0.35
+    }).addTo(group);
+    layers[b.id]=r;
   });
 }
 
-/* ================= SEARCH (CORRECT) ================= */
-searchBtn.onclick = ()=>{
+/* ================= SEARCH (FIXED) ================= */
+searchBtn.onclick=()=>{
   clearMsg();
 
-  const m = searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
-  if(!m){ showMsg("Use format: 1-B-720 or 2-B-720"); return; }
+  const m = searchInput.value.trim().toUpperCase()
+    .match(/^([12])-([A-Z])-(\d{1,3})$/);
+
+  if(!m){
+    showMsg("Use format: 1-B-66 or 2-A-217");
+    return;
+  }
 
   const sector = +m[1];
-  const quarter = m[2];
+  const quarter = `${m[2]}-${m[3]}`;
 
   const found = data.find(d =>
     d.sector === sector &&
+    d.map === sector &&      // 🔐 CORE FIX
     d.expanded.includes(quarter)
   );
 
   if(!found){
-    showMsg("Quarter not available");
+    showMsg("Quarter not found in this sector");
     return;
   }
 
-  if(last) last.setStyle({weight:2,fillOpacity:.35});
+  if(last) last.setStyle({weight:2,fillOpacity:0.35});
 
-  const layer = layers[found.id];
-  layer.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
-  last = layer;
-  map.fitBounds(layer.getBounds().pad(.35));
+  const l = layers[found.id];
+  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:0.6});
+  last=l;
+  map.fitBounds(l.getBounds().pad(0.35));
 };
 
 /* ================= RESET ================= */
-resetBtn.onclick = ()=>{
+resetBtn.onclick=()=>{
   clearMsg();
   searchInput.value="";
   suggestBox.style.display="none";
-  if(last){ last.setStyle({weight:2,fillOpacity:.35}); last=null; }
+  if(last){last.setStyle({weight:2,fillOpacity:0.35});last=null}
   map.fitBounds(fullBounds);
 };
 
-/* ================= AUTOSUGGEST + AUTO UPPERCASE ================= */
-searchInput.oninput = ()=>{
+/* ================= AUTOSUGGEST + UPPERCASE ================= */
+searchInput.oninput=()=>{
   searchInput.value = searchInput.value.toUpperCase();
   const q = searchInput.value;
   suggestBox.innerHTML="";
-  if(q.length<3){ suggestBox.style.display="none"; return; }
+  if(q.length<3){suggestBox.style.display="none";return}
 
   const out=[];
-  data.forEach(d=>d.expanded.forEach(b=>{
-    const v=`${d.sector}-${b}`;
-    if(v.startsWith(q)) out.push(v);
-  }));
+  data.forEach(d=>{
+    if(d.map !== Number(q[0])) return;   // 🔒 lock map
+    d.expanded.forEach(e=>{
+      const v=`${d.map}-${e}`;
+      if(v.startsWith(q)) out.push(v);
+    });
+  });
 
   [...new Set(out)].slice(0,15).forEach(v=>{
-    const div=document.createElement("div");
-    div.className="suggest-item";
-    div.textContent=v;
-    div.onclick=()=>{
+    const d=document.createElement("div");
+    d.className="suggest-item";
+    d.textContent=v;
+    d.onclick=()=>{
       searchInput.value=v;
       suggestBox.style.display="none";
       searchBtn.onclick();
     };
-    suggestBox.appendChild(div);
+    suggestBox.appendChild(d);
   });
-  suggestBox.style.display = out.length ? "block" : "none";
+  suggestBox.style.display=out.length?"block":"none";
 };
 </script>
 </body>
