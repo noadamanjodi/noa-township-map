@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
 <style>
 html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
@@ -29,12 +28,7 @@ input,button{
   margin-top:8px;
   font-size:15px
 }
-button{
-  cursor:pointer;
-  font-weight:600;
-  border:none;
-  background:#ffd24d
-}
+button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 .reset{background:#e0e7ff;color:#003f88}
 
 #msgBox{
@@ -52,24 +46,17 @@ button{
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
 
-/* Autosuggest */
+/* autosuggest */
 .suggest-box{
-  background:#fff;
-  border-radius:10px;
+  background:#fff;border-radius:10px;
   box-shadow:0 6px 18px rgba(0,0,0,.2);
-  display:none;
-  max-height:220px;
-  overflow:auto
+  display:none;max-height:220px;overflow:auto
 }
 .suggest-item{
-  padding:10px;
-  border-bottom:1px solid #eee;
+  padding:10px;border-bottom:1px solid #eee;
   cursor:pointer
 }
 .suggest-item:hover{background:#eef4ff}
-
-/* Admin fully hidden */
-#adminSection{display:none}
 
 @media(max-width:768px){
   .content{flex-direction:column}
@@ -85,14 +72,14 @@ button{
 <div class="content">
 
 <aside class="sidebar">
-<div class="panel">
-  <strong>Search Quarter (Format: 1-B-720)</strong>
-  <input id="searchInput" placeholder="1-B-720">
-  <button id="searchBtn">Find</button>
-  <button class="reset" id="resetBtn">Reset</button>
-  <div id="msgBox"></div>
-  <div id="suggestBox" class="suggest-box"></div>
-</div>
+  <div class="panel">
+    <strong>Search Quarter (Format: 1-B-720)</strong>
+    <input id="searchInput" placeholder="1-B-720">
+    <button id="searchBtn">Find</button>
+    <button class="reset" id="resetBtn">Reset</button>
+    <div id="msgBox"></div>
+    <div id="suggestBox" class="suggest-box"></div>
+  </div>
 </aside>
 
 <div class="map-wrap">
@@ -103,33 +90,32 @@ button{
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
 /* ================= CONFIG ================= */
-const IMG_W=4400, IMG_H=3080;
-const IMG1="./sector1.png";
-const IMG2="./sector2.png";
+const IMG_W = 4400, IMG_H = 3080;
+const IMG1 = "./sector1.png"; // top
+const IMG2 = "./sector2.png"; // bottom
 
-const JSON1="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
-const JSON2="https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
+const JSON1 = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector1_ranges.json";
+const JSON2 = "https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/sector2_ranges.json";
 
 /* ================= MAP ================= */
-const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
-const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
-const fullBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds1 = [map.unproject([0,IMG_H],0), map.unproject([IMG_W,0],0)];
+const bounds2 = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,IMG_H],0)];
+const fullBounds = [map.unproject([0,IMG_H*2],0), map.unproject([IMG_W,0],0)];
 
 L.imageOverlay(IMG1,bounds1).addTo(map);
 L.imageOverlay(IMG2,bounds2).addTo(map);
 map.fitBounds(fullBounds);
 
 /* ================= STATE ================= */
-let data=[], layers={}, last=null;
-const group=L.featureGroup().addTo(map);
+let data = [], layers = {}, last = null;
+const group = L.featureGroup().addTo(map);
 
 /* ================= MESSAGE ================= */
-const msgBox=document.getElementById("msgBox");
+const msgBox = document.getElementById("msgBox");
 function showMsg(t){msgBox.innerText=t;msgBox.style.display="block"}
 function clearMsg(){msgBox.style.display="none"}
 
@@ -138,9 +124,9 @@ Promise.all([
   fetch(JSON1).then(r=>r.json()),
   fetch(JSON2).then(r=>r.json())
 ]).then(([j1,j2])=>{
-  data=[
-    ...(j1.sectors?.[1]||[]).map(b=>({...b,map:1})),
-    ...(j2.sectors?.[2]||[]).map(b=>({...b,map:2}))
+  data = [
+    ...(j1.sectors?.[1]||[]),
+    ...(j2.sectors?.[2]||[])
   ];
   render();
 });
@@ -155,65 +141,63 @@ function shift(b,mapNo){
 /* ================= RENDER ================= */
 function render(){
   group.clearLayers();
-  layers={};
+  layers = {};
   data.forEach(b=>{
-    const r=L.rectangle(shift(b.boundsLatLng,b.map),{
-      color:b.map===1?"#1976d2":"#c62828",
-      weight:2,
-      fillOpacity:.35
-    }).addTo(group);
-    layers[b.id]=r;
+    const r = L.rectangle(
+      shift(b.boundsLatLng, b.map),
+      {
+        color: b.map===1 ? "#1976d2" : "#c62828",
+        weight: 2,
+        fillOpacity: .35
+      }
+    ).addTo(group);
+    layers[b.id] = r;
   });
 }
 
-/* ================= SEARCH (FIXED) ================= */
-searchBtn.onclick=()=>{
+/* ================= SEARCH (CORRECT) ================= */
+searchBtn.onclick = ()=>{
   clearMsg();
 
-  const m=searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
-  if(!m){
-    showMsg("Use format: 1-B-720 or 2-B-720");
-    return;
-  }
+  const m = searchInput.value.trim().toUpperCase().match(/^([12])-(.+)$/);
+  if(!m){ showMsg("Use format: 1-B-720 or 2-B-720"); return; }
 
-  const sector=+m[1];
-  const quarter=m[2];
+  const sector = +m[1];
+  const quarter = m[2];
 
-  const found=data.find(d =>
-    d.sector===sector &&
-    d.map===sector &&       // 🔑 CRITICAL FIX
+  const found = data.find(d =>
+    d.sector === sector &&
     d.expanded.includes(quarter)
   );
 
   if(!found){
-    showMsg("Quarter not available in this sector");
+    showMsg("Quarter not available");
     return;
   }
 
   if(last) last.setStyle({weight:2,fillOpacity:.35});
 
-  const layer=layers[found.id];
+  const layer = layers[found.id];
   layer.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
-  last=layer;
+  last = layer;
   map.fitBounds(layer.getBounds().pad(.35));
 };
 
 /* ================= RESET ================= */
-resetBtn.onclick=()=>{
+resetBtn.onclick = ()=>{
   clearMsg();
   searchInput.value="";
   suggestBox.style.display="none";
-  if(last){last.setStyle({weight:2,fillOpacity:.35});last=null}
+  if(last){ last.setStyle({weight:2,fillOpacity:.35}); last=null; }
   map.fitBounds(fullBounds);
 };
 
 /* ================= AUTOSUGGEST + AUTO UPPERCASE ================= */
-searchInput.oninput=()=>{
-  searchInput.value=searchInput.value.toUpperCase();
-
-  const q=searchInput.value;
+searchInput.oninput = ()=>{
+  searchInput.value = searchInput.value.toUpperCase();
+  const q = searchInput.value;
   suggestBox.innerHTML="";
-  if(q.length<3){suggestBox.style.display="none";return}
+  if(q.length<3){ suggestBox.style.display="none"; return; }
 
   const out=[];
   data.forEach(d=>d.expanded.forEach(b=>{
@@ -222,17 +206,17 @@ searchInput.oninput=()=>{
   }));
 
   [...new Set(out)].slice(0,15).forEach(v=>{
-    const d=document.createElement("div");
-    d.className="suggest-item";
-    d.textContent=v;
-    d.onclick=()=>{
+    const div=document.createElement("div");
+    div.className="suggest-item";
+    div.textContent=v;
+    div.onclick=()=>{
       searchInput.value=v;
       suggestBox.style.display="none";
       searchBtn.onclick();
     };
-    suggestBox.appendChild(d);
+    suggestBox.appendChild(div);
   });
-  suggestBox.style.display=out.length?"block":"none";
+  suggestBox.style.display = out.length ? "block" : "none";
 };
 </script>
 </body>
