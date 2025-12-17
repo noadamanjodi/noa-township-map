@@ -34,7 +34,7 @@ header{
   position:relative;
 }
 .panel{margin-bottom:16px}
-input,select,button{
+input,button{
   width:100%;
   padding:12px;
   border-radius:10px;
@@ -52,7 +52,7 @@ button{
 /* AUTOSUGGEST */
 .suggest-box{
   position:absolute;
-  top:175px;
+  top:120px;
   left:14px;
   right:14px;
   background:#fff;
@@ -76,7 +76,6 @@ button{
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
 
-/* MOBILE */
 @media(max-width:768px){
   .content{flex-direction:column}
   .sidebar{width:100%}
@@ -86,29 +85,17 @@ button{
 
 <body>
 <div class="app">
-<header>Township Map – Sector 1 & Sector 2</header>
+<header>Township Map – Sector 1 (Top) & Sector 2 (Bottom)</header>
 
 <div class="content">
 
 <aside class="sidebar">
-
-  <!-- SECTOR SELECT -->
-  <div class="panel">
-    <strong>Select Sector</strong>
-    <select id="sectorSelect">
-      <option value="1">Sector-1</option>
-      <option value="2">Sector-2</option>
-    </select>
-  </div>
-
-  <!-- SEARCH -->
   <div class="panel">
     <strong>Search Quarter</strong>
-    <input id="searchInput" placeholder="Example: B-168" autocomplete="off">
+    <input id="searchInput" placeholder="Example: 1-B-720 or 2-B-168" autocomplete="off">
     <button id="searchBtn">🔍 Find</button>
     <div id="suggestBox" class="suggest-box"></div>
   </div>
-
 </aside>
 
 <div class="map-wrap">
@@ -131,16 +118,19 @@ const bounds = [
   map.unproject([IMG_W,0],0)
 ];
 
-/* ================= IMAGE OVERLAYS ================= */
-const overlay1 = L.imageOverlay("./sector1.png", bounds);
-const overlay2 = L.imageOverlay("./sector2.png", bounds);
+/* ================= IMAGE LAYERS (STACKED) ================= */
+const overlaySector2 = L.imageOverlay("./sector2.png", bounds).addTo(map); // bottom
+const overlaySector1 = L.imageOverlay("./sector1.png", bounds).addTo(map); // top
+
+map.fitBounds(bounds);
 
 /* ================= GROUPS ================= */
-const group1 = L.featureGroup();
-const group2 = L.featureGroup();
+const group1 = L.featureGroup().addTo(map);
+const group2 = L.featureGroup().addTo(map);
 
 const layers = {1:{},2:{}};
 let data = [];
+let lastHighlight=null;
 
 /* ================= LOAD JSONs ================= */
 Promise.all([
@@ -152,7 +142,6 @@ Promise.all([
     ...(s2.sectors?.[2] || [])
   ];
   render();
-  switchSector(1); // default
 });
 
 /* ================= RENDER ================= */
@@ -174,45 +163,48 @@ function render(){
   });
 }
 
-/* ================= SECTOR SWITCH ================= */
-function switchSector(sec){
-  map.eachLayer(l=>{
-    if(l!==map) map.removeLayer(l);
-  });
-
-  if(sec==1){
-    overlay1.addTo(map);
-    group1.addTo(map);
-  }else{
-    overlay2.addTo(map);
-    group2.addTo(map);
+/* ================= SEARCH ================= */
+function clearHighlight(){
+  if(lastHighlight){
+    lastHighlight.setStyle({weight:2,fillOpacity:0.35});
+    lastHighlight=null;
   }
-  map.fitBounds(bounds);
 }
 
-sectorSelect.onchange=()=>{
-  switchSector(parseInt(sectorSelect.value,10));
-  searchInput.value="";
-  suggestBox.style.display="none";
-};
+function doSearch(raw){
+  const m = raw.match(/^([12])-(.+)$/);
+  if(!m){
+    alert("❌ Use format like 1-B-720 or 2-B-168 only");
+    return;
+  }
 
-/* ================= SEARCH ================= */
-function doSearch(quarter){
-  const sector = parseInt(sectorSelect.value,10);
+  const sector = parseInt(m[1],10);
+  const quarter = m[2];
+
   const found = data.find(d =>
     d.sector===sector && d.expanded.includes(quarter)
   );
+
   if(!found){
-    alert("Block not found in selected sector");
+    alert(`❌ ${quarter} not found in Sector-${sector}`);
     return;
   }
-  map.fitBounds(layers[sector][found.id].getBounds().pad(0.35));
+
+  clearHighlight();
+
+  const layer = layers[sector][found.id];
+  layer.setStyle({
+    weight:4,
+    fillOpacity:0.6
+  });
+
+  lastHighlight = layer;
+  map.fitBounds(layer.getBounds().pad(0.35));
 }
 
 searchBtn.onclick=()=>{
-  const q = searchInput.value.trim().toUpperCase();
-  if(!q) return;
-  doSearch(q);
+  const v = searchInput.value.trim().toUpperCase();
+  if(v) doSearch(v);
 };
 
 /* ================= AUTO-SUGGEST ================= */
@@ -221,29 +213,29 @@ const suggestBox = document.getElementById("suggestBox");
 searchInput.oninput=()=>{
   const q = searchInput.value.trim().toUpperCase();
   suggestBox.innerHTML="";
-  if(q.length<2){
+
+  if(q.length<3){
     suggestBox.style.display="none";
     return;
   }
 
-  const sector = parseInt(sectorSelect.value,10);
-  const matches = [];
+  const matches=[];
 
   data.forEach(d=>{
-    if(d.sector!==sector) return;
     d.expanded.forEach(b=>{
-      if(b.startsWith(q)) matches.push(b);
+      const full = `${d.sector}-${b}`;
+      if(full.startsWith(q)) matches.push(full);
     });
   });
 
-  [...new Set(matches)].slice(0,20).forEach(b=>{
+  [...new Set(matches)].slice(0,20).forEach(v=>{
     const div=document.createElement("div");
     div.className="suggest-item";
-    div.textContent=b;
+    div.textContent=v;
     div.onclick=()=>{
-      searchInput.value=b;
+      searchInput.value=v;
       suggestBox.style.display="none";
-      doSearch(b);
+      doSearch(v);
     };
     suggestBox.appendChild(div);
   });
