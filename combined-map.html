@@ -4,27 +4,54 @@
 <meta charset="utf-8">
 <title>Township Combined Map – Sector 1 & 2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
-html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:#f4f6fb;
+}
 .app{height:100%;display:flex;flex-direction:column}
-header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600;text-align:center}
+header{
+  background:#003f88;
+  color:#fff;
+  padding:12px;
+  font-size:18px;
+  font-weight:600;
+  text-align:center
+}
 .content{flex:1;display:flex;min-height:0}
 
+/* SIDEBAR */
 .sidebar{
-  width:320px;background:#fff;padding:14px;
+  width:320px;
+  background:#fff;
+  padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.1);
 }
 .panel{margin-bottom:16px}
 input,button{
-  width:100%;padding:12px;border-radius:10px;
-  border:1px solid #ccc;margin-top:8px;font-size:15px
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid #ccc;
+  margin-top:8px;
+  font-size:15px
 }
-button{cursor:pointer;font-weight:600;background:#ffd24d;border:none}
-.reset{background:#e0e0e0}
+button{
+  cursor:pointer;
+  font-weight:600;
+  background:#ffd24d;
+  border:none
+}
+button.reset{
+  background:#e0e0e0;
+}
 
-/* INLINE ERROR */
+/* INLINE ERROR (NEW – NO POPUP) */
 #errorMsg{
   display:none;
   margin-top:10px;
@@ -36,9 +63,15 @@ button{cursor:pointer;font-weight:600;background:#ffd24d;border:none}
   font-weight:600;
 }
 
+/* MAP */
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
 .leaflet-image-layer{pointer-events:none}
+
+@media(max-width:768px){
+  .content{flex-direction:column}
+  .sidebar{width:100%}
+}
 </style>
 </head>
 
@@ -69,92 +102,112 @@ button{cursor:pointer;font-weight:600;background:#ffd24d;border:none}
 
 <script>
 /* ================= MAP ================= */
-const IMG_W=4400, IMG_H=3080;
-const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const bounds=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
+const IMG_W = 4400;
+const IMG_H = 3080;
 
-L.imageOverlay("./sector2.png",bounds).addTo(map);
-L.imageOverlay("./sector1.png",bounds).addTo(map);
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const bounds = [
+  map.unproject([0,IMG_H],0),
+  map.unproject([IMG_W,0],0)
+];
+
+/* SAME IMAGE LOGIC (UNCHANGED) */
+L.imageOverlay("./sector2.png", bounds).addTo(map);
+L.imageOverlay("./sector1.png", bounds).addTo(map);
 map.fitBounds(bounds);
 
 /* ================= DATA ================= */
-const group=L.featureGroup().addTo(map);
-const layers={};
-let data=[], lastHighlight=null;
+const group = L.featureGroup().addTo(map);
+const layers = {};
+let data = [];
+let lastHighlight = null;
 
-const errorMsg=document.getElementById("errorMsg");
+const errorMsg = document.getElementById("errorMsg");
+
+/* ================= ERROR HELPERS ================= */
+function showError(msg){
+  errorMsg.innerText = msg;
+  errorMsg.style.display = "block";
+}
+function clearError(){
+  errorMsg.style.display = "none";
+}
 
 /* ================= LOAD JSON ================= */
 fetch("https://raw.githubusercontent.com/noadamanjodi/noa-township-map/main/township_blocks.json")
 .then(r=>r.json())
 .then(j=>{
-  data=j.blocks||[];
+  data = j.blocks || [];
   data.forEach(b=>{
-    const rect=L.rectangle(b.boundsLatLng,{
-      color:b.sector===1?"#1976d2":"#c62828",
+    const rect = L.rectangle(b.boundsLatLng,{
+      color: b.sector === 1 ? "#1976d2" : "#c62828",
       weight:2,
-      fillOpacity:.35
+      fillOpacity:0.35
     }).bindTooltip(`Sector-${b.sector} : ${b.rangeText}`,{sticky:true})
       .addTo(group);
-    layers[b.id]=rect;
+
+    /* STORE ORIGINAL COLOR (FIX-2) */
+    rect.options.originalColor = b.sector === 1 ? "#1976d2" : "#c62828";
+
+    layers[b.id] = rect;
   });
 });
 
-/* ================= UTIL ================= */
-function showError(msg){
-  errorMsg.innerText=msg;
-  errorMsg.style.display="block";
-}
-function clearError(){
-  errorMsg.style.display="none";
-}
-
+/* ================= CLEAR HIGHLIGHT (FIXED) ================= */
 function clearHighlight(){
   if(lastHighlight){
-    const s=lastHighlight.options.sector;
     lastHighlight.setStyle({
-      color:s===1?"#1976d2":"#c62828",
+      color: lastHighlight.options.originalColor,
       weight:2,
-      fillOpacity:.35
+      fillOpacity:0.35
     });
-    lastHighlight=null;
+    lastHighlight = null;
   }
 }
 
 /* ================= SEARCH ================= */
-function doSearch(v){
+function doSearch(raw){
   clearError();
-  const m=v.match(/^([12])-(.+)$/);
-  if(!m){ showError("❌ Use format like 1-B-720 or 2-B-168"); return; }
 
-  const sector=+m[1], q=m[2];
-  const found=data.find(d=>d.sector===sector && d.expanded.includes(q));
+  const m = raw.match(/^([12])-(.+)$/);
+  if(!m){
+    showError("❌ Use format like 1-B-720 or 2-B-168");
+    return;
+  }
+
+  const sector = +m[1];
+  const quarter = m[2];
+
+  const found = data.find(d =>
+    d.sector === sector && d.expanded.includes(quarter)
+  );
 
   if(!found){
-    showError(`❌ ${q} not found in Sector-${sector}`);
+    showError(`❌ ${quarter} not found in Sector-${sector}`);
     return;
   }
 
   clearHighlight();
-  const layer=layers[found.id];
-  layer.options.sector=sector;
+
+  const layer = layers[found.id];
   layer.setStyle({
     color:"#2e7d32",
     weight:4,
-    fillOpacity:.6
+    fillOpacity:0.6
   });
-  lastHighlight=layer;
-  map.fitBounds(layer.getBounds().pad(.35));
+
+  lastHighlight = layer;
+  map.fitBounds(layer.getBounds().pad(0.35));
 }
 
-searchBtn.onclick=()=>{
-  const v=searchInput.value.trim().toUpperCase();
+searchBtn.onclick = ()=>{
+  const v = searchInput.value.trim().toUpperCase();
   if(v) doSearch(v);
 };
 
 /* ================= RESET ================= */
-resetBtn.onclick=()=>{
-  searchInput.value="";
+resetBtn.onclick = ()=>{
+  searchInput.value = "";
   clearError();
   clearHighlight();
   map.fitBounds(bounds);
