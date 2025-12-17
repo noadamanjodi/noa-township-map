@@ -2,194 +2,190 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Township Combined Map</title>
+<title>Township Combined Map – Admin</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
 <style>
 html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
 .app{height:100%;display:flex;flex-direction:column}
 header{background:#003f88;color:#fff;padding:12px;font-size:18px;font-weight:600;text-align:center}
-.content{flex:1;display:flex}
+.content{flex:1;display:flex;min-height:0}
 
 .sidebar{
-  width:330px;background:#fff;padding:14px;
+  width:350px;background:#fff;padding:14px;
   box-shadow:2px 0 12px rgba(0,0,0,.15);
   overflow:auto
 }
+.panel{margin-bottom:14px}
 input,button{
   width:100%;padding:12px;border-radius:10px;
   border:1px solid #ccc;margin-top:8px;font-size:15px
 }
-button{background:#ffd24d;font-weight:600;border:none;cursor:pointer}
+button{cursor:pointer;font-weight:600;border:none;background:#ffd24d}
 .reset{background:#e0e7ff;color:#003f88}
+.admin{background:#b6e57a}
+.save{background:#9fd0ff}
 
 #msgBox{
   display:none;margin-top:10px;padding:10px;
-  border-radius:8px;font-weight:600;
+  border-radius:8px;font-size:14px;font-weight:600;
   background:#ffe4e4;color:#b00020
 }
-
-.map-wrap{flex:1}
-#map{width:100%;height:100%}
 
 .suggest-box{
   background:#fff;border-radius:10px;
   box-shadow:0 6px 18px rgba(0,0,0,.2);
   display:none;max-height:220px;overflow:auto
 }
-.suggest-item{
-  padding:10px;border-bottom:1px solid #eee;cursor:pointer
-}
+.suggest-item{padding:10px;border-bottom:1px solid #eee;cursor:pointer}
 .suggest-item:hover{background:#eef4ff}
+
+.map-wrap{flex:1}
+#map{width:100%;height:100%}
+.leaflet-image-layer{pointer-events:none}
+
+@media(max-width:768px){
+  .content{flex-direction:column}
+  .sidebar{width:100%}
+}
 </style>
 </head>
 
 <body>
 <div class="app">
-<header>Township Combined Map – Sector 1 & 2</header>
+<header>Township Combined Map – Single JSON</header>
 
 <div class="content">
+
 <aside class="sidebar">
-<strong>Search Quarter (Format: 1-B-529)</strong>
-<input id="searchInput" placeholder="1-B-529">
-<button id="searchBtn">Find</button>
-<button class="reset" id="resetBtn">Reset</button>
-<div id="msgBox"></div>
-<div id="suggestBox" class="suggest-box"></div>
+
+<div class="panel">
+  <strong>Search Quarter</strong><br>
+  <small>Format: <b>1-B-720</b></small>
+  <input id="searchInput" placeholder="1-B-720">
+  <div id="suggestBox" class="suggest-box"></div>
+  <button id="searchBtn">🔍 Find</button>
+  <button class="reset" id="resetBtn">🔄 Reset</button>
+  <div id="msgBox"></div>
+</div>
+
+<div class="panel">
+  <input id="adminPass" type="password" placeholder="Admin password">
+  <button class="admin" id="unlockBtn">Unlock Admin</button>
+</div>
+
+<div class="panel" id="adminTools" style="display:none">
+  <button id="toggleDraw">Enable Drawing</button>
+  <button id="exportBtn">📄 Export Selected Block</button>
+  <button class="save" id="saveGithub">☁️ Save to GitHub</button>
+</div>
+
 </aside>
 
 <div class="map-wrap"><div id="map"></div></div>
+
 </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
 <script>
-/* CONFIG */
-const IMG_W=4400, IMG_H=3080;
-const IMG1="./sector1.png";
-const IMG2="./sector2.png";
+/* ================= CONFIG ================= */
+const IMG_W = 4400, IMG_H = 3080;
+const IMG_TOP = "./sector1.png";
+const IMG_BOTTOM = "./sector2.png";
+const JSON_URL = "./township_blocks.json";
 
-const JSON1="sector1_ranges.json";
-const JSON2="sector2_ranges.json";
+/* ================= MAP ================= */
+const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
+const topBounds = [map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
+const bottomBounds = [map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
+const fullBounds = [map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
 
-/* MAP */
-const map=L.map("map",{crs:L.CRS.Simple,minZoom:-4});
-const bounds1=[map.unproject([0,IMG_H],0),map.unproject([IMG_W,0],0)];
-const bounds2=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,IMG_H],0)];
-const fullBounds=[map.unproject([0,IMG_H*2],0),map.unproject([IMG_W,0],0)];
-
-L.imageOverlay(IMG1,bounds1).addTo(map);
-L.imageOverlay(IMG2,bounds2).addTo(map);
+L.imageOverlay(IMG_TOP,topBounds).addTo(map);
+L.imageOverlay(IMG_BOTTOM,bottomBounds).addTo(map);
 map.fitBounds(fullBounds);
 
-const group=L.featureGroup().addTo(map);
+const group = L.featureGroup().addTo(map);
 
-/* STATE */
-let data=[], layers={}, last=null;
+/* ================= STATE ================= */
+let blocks=[], layers={}, highlighted=null, selected=null;
+let admin=false, editor=false;
 
-/* HELPERS */
+/* ================= MESSAGE ================= */
 const msgBox=document.getElementById("msgBox");
-function showMsg(t){msgBox.innerText=t;msgBox.style.display="block"}
-function clearMsg(){msgBox.style.display="none"}
+const showMsg=t=>{msgBox.innerText=t;msgBox.style.display="block"};
+const clearMsg=()=>msgBox.style.display="none";
 
+/* ================= LOAD JSON ================= */
+fetch(JSON_URL+"?t="+Date.now())
+.then(r=>r.json())
+.then(j=>{
+  blocks=j.blocks||[];
+  render();
+});
+
+/* ================= SHIFT ================= */
 function shift(b,mapNo){
   return mapNo===2
     ? [[b[0][0]-IMG_H,b[0][1]],[b[1][0]-IMG_H,b[1][1]]]
     : b;
 }
 
-/* LOAD DATA */
-Promise.all([
-  fetch(JSON1).then(r=>r.json()),
-  fetch(JSON2).then(r=>r.json())
-]).then(([j1,j2])=>{
-  data=[...(j1.sectors["1"]||[]),...(j2.sectors["2"]||[])];
-  render();
-});
-
-/* RENDER */
+/* ================= RENDER ================= */
 function render(){
-  group.clearLayers();
-  layers={};
-  data.forEach(b=>{
-    const r=L.rectangle(shift(b.boundsLatLng,b.map),{
-      color:b.sector===1?"#1976d2":"#c62828",
-      weight:2,fillOpacity:.35
-    }).addTo(group);
+  group.clearLayers(); layers={};
+  blocks.forEach(b=>{
+    const r=L.rectangle(
+      shift(b.boundsLatLng,b.map),
+      {color:b.sector===1?"#1976d2":"#c62828",weight:2,fillOpacity:.35}
+    ).addTo(group);
+    r.bindTooltip(`Sector ${b.sector} • ${b.rangeText}`);
+    r.on("click",()=>selected=b);
     layers[b.id]=r;
   });
 }
 
-/* SEARCH — FIXED */
-searchBtn.onclick = () => {
+/* ================= SEARCH ================= */
+searchBtn.onclick=()=>{
   clearMsg();
-
-  const m = searchInput.value.trim().toUpperCase()
+  const m=searchInput.value.trim().toUpperCase()
     .match(/^([12])-([A-Z])-(\d+)$/);
+  if(!m){showMsg("Use format: 1-B-720");return;}
 
-  if (!m) {
-    showMsg("Use format 1-B-65");
-    return;
-  }
+  const sector=+m[1], q=`${m[2]}-${m[3]}`;
+  const f=blocks.find(b=>b.sector===sector && b.expanded.includes(q));
+  if(!f){showMsg("Quarter not found in this sector");return;}
 
-  const sector = +m[1];
-  const block = m[2];
-  const num = m[3];
-  const target = `${block}-${num}`;
-
-  const found = data.find(d =>
-    d.sector === sector &&
-    d.expanded.some(e => e === target)
-  );
-
-  if (!found) {
-    showMsg("Quarter not found in this sector");
-    return;
-  }
-
-  if (last) last.setStyle({ weight: 2, fillOpacity: .35 });
-
-  const layer = layers[found.id];
-  layer.setStyle({
-    color: "#2e7d32",
-    weight: 4,
-    fillOpacity: .6
-  });
-
-  last = layer;
-  map.fitBounds(layer.getBounds().pad(0.35));
+  if(highlighted)highlighted.setStyle({weight:2,fillOpacity:.35});
+  const l=layers[f.id];
+  l.setStyle({color:"#2e7d32",weight:4,fillOpacity:.6});
+  highlighted=l;
+  map.fitBounds(l.getBounds().pad(.35));
 };
 
-/* RESET */
-resetBtn.onclick=()=>{
-  clearMsg(); searchInput.value="";
-  if(last){last.setStyle({weight:2,fillOpacity:.35});last=null}
-  map.fitBounds(fullBounds);
-};
-
-/* AUTOSUGGEST */
+/* ================= AUTOSUGGEST ================= */
 searchInput.oninput=()=>{
   searchInput.value=searchInput.value.toUpperCase();
   const q=searchInput.value;
   suggestBox.innerHTML="";
-  if(q.length<3){suggestBox.style.display="none";return}
+  if(q.length<3){suggestBox.style.display="none";return;}
 
   const out=[];
-  data.forEach(d=>{
-    if(!q.startsWith(d.sector+"-")) return;
-    d.expanded.forEach(e=>{
-      const v=`${d.sector}-${e}`;
+  blocks.forEach(b=>{
+    b.expanded.forEach(e=>{
+      const v=`${b.sector}-${e}`;
       if(v.startsWith(q)) out.push(v);
     });
   });
 
-  [...new Set(out)].slice(0,15).forEach(v=>{
+  [...new Set(out)].slice(0,20).forEach(v=>{
     const d=document.createElement("div");
-    d.className="suggest-item";
-    d.textContent=v;
+    d.className="suggest-item"; d.textContent=v;
     d.onclick=()=>{
       searchInput.value=v;
       suggestBox.style.display="none";
@@ -199,6 +195,117 @@ searchInput.oninput=()=>{
   });
   suggestBox.style.display=out.length?"block":"none";
 };
+
+/* ================= RESET ================= */
+resetBtn.onclick=()=>{
+  clearMsg(); searchInput.value="";
+  suggestBox.style.display="none";
+  if(highlighted){highlighted.setStyle({weight:2,fillOpacity:.35});highlighted=null;}
+  map.fitBounds(fullBounds);
+};
+
+/* ================= ADMIN ================= */
+unlockBtn.onclick=()=>{
+  if(adminPass.value==="NALCO123"){
+    admin=true; adminTools.style.display="block";
+    alert("Admin unlocked");
+  } else alert("Wrong password");
+};
+
+/* ================= DRAW ================= */
+const draw=new L.Control.Draw({
+  draw:{rectangle:true,marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
+});
+toggleDraw.onclick=()=>{
+  if(!admin)return;
+  editor=!editor;
+  editor?map.addControl(draw):map.removeControl(draw);
+};
+
+map.on(L.Draw.Event.CREATED,e=>{
+  if(!editor)return;
+  const sector=+prompt("Sector (1/2)");
+  const mapNo=+prompt("Map (1=top,2=bottom)");
+  const range=prompt("Range (B-145-160)");
+  if(!sector||!mapNo||!range)return;
+
+  const b=e.layer.getBounds();
+  blocks.push({
+    id:"id_"+Date.now(),
+    sector,map:mapNo,
+    rangeText:range.toUpperCase(),
+    expanded:expand(range),
+    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
+  });
+  render();
+});
+
+/* ================= EXPORT ================= */
+exportBtn.onclick=()=>{
+  if(!selected)return alert("Select a block");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(selected,null,2)]));
+  a.download="block.json"; a.click();
+};
+
+/* ================= SAVE TO GITHUB ================= */
+saveGithub.onclick=async()=>{
+  const conflicts = detectConflicts(blocks);
+  if(conflicts.length){
+    console.table(conflicts);
+    alert("⚠️ Conflicts detected. Check console.");
+    return;
+  }
+  await saveToGitHub(blocks);
+};
+
+/* ================= UTIL ================= */
+function expand(s){
+  const m=s.replace(/\s/g,"").toUpperCase().match(/^([A-Z])-(\d+)(?:-(\d+))?$/);
+  if(!m)return[];
+  const a=+m[2],b=+m[3]||a,o=[];
+  for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
+  return o;
+}
+
+function detectConflicts(arr){
+  const seen={}, bad=[];
+  arr.forEach(b=>{
+    b.expanded.forEach(q=>{
+      const k=`${b.sector}-${q}`;
+      if(seen[k]) bad.push({quarter:k,blocks:[seen[k],b.id]});
+      else seen[k]=b.id;
+    });
+  });
+  return bad;
+}
+
+async function saveToGitHub(blocks){
+  let token=localStorage.getItem("GITHUB_TOKEN");
+  if(!token){
+    token=prompt("Enter GitHub Token");
+    if(!token)return;
+    localStorage.setItem("GITHUB_TOKEN",token);
+  }
+  const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/township_blocks.json";
+  let sha=null;
+  const r=await fetch(api,{headers:{Authorization:`Bearer ${token}`}});
+  if(r.ok){sha=(await r.json()).sha;}
+
+  const body={
+    message:"Update township blocks",
+    content:btoa(unescape(encodeURIComponent(JSON.stringify({blocks},null,2))))
+  };
+  if(sha) body.sha=sha;
+
+  const res=await fetch(api,{
+    method:"PUT",
+    headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+    body:JSON.stringify(body)
+  });
+  if(!res.ok) throw new Error("Save failed");
+  alert("✅ Saved to GitHub");
+}
 </script>
 </body>
 </html>
