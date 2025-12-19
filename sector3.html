@@ -74,14 +74,7 @@ color:#fff;
     </div>
 
     <!-- Admin controls removed from public view -->
-    <div class="panel">
-      <button id="showAdmin">Admin Login</button>
-    </div>
 
-    <div id="adminLoginPanel" class="panel">
-      <input id="adminPass" type="password" placeholder="Password">
-      <button class="unlock" id="unlockBtn">Unlock</button>
-    </div>
 
     <div class="panel" id="adminTools" style="display:none">
       <button id="toggleDraw">Enable Drawing</button>
@@ -202,10 +195,6 @@ resetBtn.onclick = ()=>{
 
 /* ================= ADMIN LOGIN ================= */
 
-showAdmin.onclick = ()=>{
- adminLoginPanel.style.display =
- (adminLoginPanel.style.display=="block"?"none":"block");
-};
 
 unlockBtn.onclick=()=>{
   if(adminPass.value==="NALCO123"){
