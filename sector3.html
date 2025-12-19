@@ -18,43 +18,112 @@ gtag('config', 'G-G5WFS9428J');
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
 <style>
-html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
-.app{height:100%;display:flex;flex-direction:column}
-header{background:#003f88;color:#fff;padding:12px 16px;font-size:18px;font-weight:600}
-.content{flex:1;display:flex;min-height:0}
-
-/* ---- Responsive ---- */
-@media(max-width:700px){
-.sidebar{width:100%!important;max-height:320px;}
-.app{height:auto;}
-.content{flex-direction:column;}
-.map-wrap{height:80vh;}
+html,body{
+  height:100%;
+  margin:0;
+  font-family:Segoe UI,Arial;
+  background:#f4f6fb
 }
 
-.sidebar{width:320px;background:#fff;padding:14px;overflow:auto;box-shadow:2px 0 12px rgba(0,0,0,.1)}
+.app{
+  height:100%;
+  display:flex;
+  flex-direction:column
+}
+
+header{
+  background:#003f88;
+  color:#fff;
+  padding:12px 16px;
+  font-size:18px;
+  font-weight:600
+}
+
+.content{
+  flex:1;
+  display:flex;
+  min-height:0
+}
+
+.sidebar{
+  width:320px;
+  background:#fff;
+  padding:14px;
+  overflow:auto;
+  box-shadow:2px 0 12px rgba(0,0,0,.1)
+}
+
 .panel{margin-bottom:14px}
-input,button{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;margin-top:6px}
-button{cursor:pointer;font-weight:600}
+
+input,button{
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  margin-top:6px
+}
+
+button{
+  cursor:pointer;
+  font-weight:600
+}
+
 .find{background:#ffd24d;border:none}
 .unlock{background:#b6e57a;border:none}
 .save{background:#9fd0ff;border:none}
-.map-wrap{flex:1}
-#map{width:100%;height:100%}
+
+.map-wrap{
+  flex:1;
+}
+
+#map{
+  width:100%;
+  height:100%;
+  min-height:500px; /* Desktop stability fix */
+}
 
 /* Message styling */
 #msgBox{
-margin-top:6px;
-padding:8px;
-text-align:center;
-font-weight:600;
-font-size:14px;
-border-radius:6px;
-display:none;
-color:#fff;
+  margin-top:6px;
+  padding:8px;
+  text-align:center;
+  font-weight:600;
+  font-size:14px;
+  border-radius:6px;
+  display:none;
+  color:#fff;
 }
 
 /* hide admin area by default */
 #adminLoginPanel{display:none;}
+
+
+/* ========================
+   🔥 MOBILE FRIENDLY PATCH
+   ======================== */
+@media(max-width:700px){
+
+  .content{
+    flex-direction:column;
+  }
+
+  .sidebar{
+    width:100%!important;
+    max-height:280px;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+  }
+
+  .map-wrap{
+    min-height:55vh !important;
+    height:auto !important;
+  }
+
+  #map{
+    min-height:55vh !important;
+    height:auto !important;
+  }
+}
+
 </style>
 </head>
 
@@ -72,9 +141,6 @@ color:#fff;
       <button style="background:#eee;border:none" id="resetBtn">Reset</button>
       <div id="msgBox"></div>
     </div>
-
-    <!-- Admin controls removed from public view -->
-
 
     <div class="panel" id="adminTools" style="display:none">
       <button id="toggleDraw">Enable Drawing</button>
@@ -141,7 +207,6 @@ function render(){
 }
 
 /* ================= SEARCH ================= */
-
 function showMsg(msg,color){
   msgBox.innerText = msg;
   msgBox.style.display = "block";
@@ -193,106 +258,6 @@ resetBtn.onclick = ()=>{
   }
 };
 
-/* ================= ADMIN LOGIN ================= */
-
-
-unlockBtn.onclick=()=>{
-  if(adminPass.value==="NALCO123"){
-    admin=true;
-    adminTools.style.display="block";
-    showMsg("Admin unlocked","#0047ab");
-  }else{
-    showMsg("Wrong password","#e63946");
-  }
-};
-
-/* ================= DRAW ================= */
-const draw = new L.Control.Draw({
-  draw:{rectangle:{shapeOptions:{color:"#ff9800"}},marker:false,polyline:false,polygon:false,circle:false,circlemarker:false}
-});
-
-toggleDraw.onclick=()=>{
-  if(!admin){
-    showMsg("Admin only","#e63946");
-    return;
-  }
-  editor=!editor;
-  toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
-  editor?map.addControl(draw):map.removeControl(draw);
-};
-
-map.on(L.Draw.Event.CREATED,e=>{
-  if(!editor) return;
-  const range = prompt("Enter range (Example: C-12-20)");
-  if(!range) return;
-
-  const exp = expand(range);
-  if(!exp.length){
-    showMsg("Invalid range","#e63946");
-    return;
-  }
-
-  const b = e.layer.getBounds();
-  data.push({
-    id:"id_"+(++counter),
-    sector:3,
-    rangeText:range.toUpperCase(),
-    expanded:exp,
-    boundsLatLng:[[b.getSouth(),b.getWest()],[b.getNorth(),b.getEast()]]
-  });
-  render();
-});
-
-/* ================= DOWNLOAD ================= */
-downloadJson.onclick=()=>{
-  const blob=new Blob([JSON.stringify({sectors:{3:data}},null,2)],{type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="sector3_ranges.json";
-  a.click();
-};
-
-/* ================= SAVE TO GITHUB ================= */
-saveGithub.onclick=async()=>{
-  if(!admin){
-    showMsg("Admin only","#e63946");
-    return;
-  }
-
-  let token = localStorage.getItem("GITHUB_TOKEN");
-  if(!token){
-    token = prompt("Enter GitHub Token");
-    if(!token) return;
-    localStorage.setItem("GITHUB_TOKEN",token);
-  }
-
-  const clean = data.map(x=>({
-    id:x.id,sector:3,rangeText:x.rangeText,expanded:x.expanded,boundsLatLng:x.boundsLatLng
-  }));
-
-  const body = {
-    message:"Update sector-3 map",
-    content:btoa(JSON.stringify({sectors:{3:clean}},null,2))
-  };
-
-  const api="https://api.github.com/repos/noadamanjodi/noa-township-map/contents/sector3_ranges.json";
-  const r = await fetch(api,{headers:{Authorization:"Bearer "+token}});
-  if(r.ok){body.sha=(await r.json()).sha}
-
-  const res = await fetch(api,{
-    method:"PUT",
-    headers:{
-      Authorization:"Bearer "+token,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify(body)
-  });
-
-  res.ok?
-  showMsg("Saved to GitHub","#0047ab"):
-  showMsg("Save failed","#e63946");
-};
-
 /* ================= UTIL ================= */
 function expand(s){
   s=s.replace(/\s/g,"").toUpperCase();
@@ -303,7 +268,6 @@ function expand(s){
   for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
   return o;
 }
-
 </script>
 </body>
 </html>
