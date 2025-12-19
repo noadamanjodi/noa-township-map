@@ -99,6 +99,17 @@ input,button{
   .sidebar{width:340px}
 }
 </style>
+
+<!-- ================= GOOGLE ANALYTICS ================= -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-G5WFS9428J"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-G5WFS9428J');
+</script>
+<!-- ==================================================== -->
+
 </head>
 
 <body>
@@ -221,7 +232,10 @@ function doSearch(v){
   map.fitBounds(highlighted[0].getBounds().pad(.35));
 }
 
-searchBtn.onclick=()=>doSearch(searchInput.value.trim().toUpperCase());
+searchBtn.onclick=()=>{
+  trackSearch();
+  doSearch(searchInput.value.trim().toUpperCase());
+};
 resetBtn.onclick=resetAll;
 
 /* ================= AUTOSUGGEST ================= */
@@ -247,6 +261,19 @@ searchInput.oninput=()=>{
 
   suggestBox.style.display=set.size?"block":"none";
 };
+function trackSearch(){
+  gtag('event', 'search_click', {
+    'event_category':'Map Actions',
+    'event_label': searchInput.value.trim().toUpperCase()
+  });
+}
+
+function trackReset(){
+  gtag('event', 'reset_click', {
+    'event_category':'Map Actions',
+    'event_label':'Reset pressed'
+  });
+}
 </script>
 </body>
 </html>
