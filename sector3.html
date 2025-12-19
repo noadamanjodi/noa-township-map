@@ -5,6 +5,15 @@
 <title>Sector-3 Township Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
+<!-- GOOGLE ANALYTICS -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-G5WFS9428J"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-G5WFS9428J');
+</script>
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
 
@@ -13,6 +22,15 @@ html,body{height:100%;margin:0;font-family:Segoe UI,Arial;background:#f4f6fb}
 .app{height:100%;display:flex;flex-direction:column}
 header{background:#003f88;color:#fff;padding:12px 16px;font-size:18px;font-weight:600}
 .content{flex:1;display:flex;min-height:0}
+
+/* ---- Responsive ---- */
+@media(max-width:700px){
+.sidebar{width:100%!important;max-height:320px;}
+.app{height:auto;}
+.content{flex-direction:column;}
+.map-wrap{height:80vh;}
+}
+
 .sidebar{width:320px;background:#fff;padding:14px;overflow:auto;box-shadow:2px 0 12px rgba(0,0,0,.1)}
 .panel{margin-bottom:14px}
 input,button{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;margin-top:6px}
@@ -22,7 +40,21 @@ button{cursor:pointer;font-weight:600}
 .save{background:#9fd0ff;border:none}
 .map-wrap{flex:1}
 #map{width:100%;height:100%}
-.leaflet-image-layer{pointer-events:none}
+
+/* Message styling */
+#msgBox{
+margin-top:6px;
+padding:8px;
+text-align:center;
+font-weight:600;
+font-size:14px;
+border-radius:6px;
+display:none;
+color:#fff;
+}
+
+/* hide admin area by default */
+#adminLoginPanel{display:none;}
 </style>
 </head>
 
@@ -37,10 +69,16 @@ button{cursor:pointer;font-weight:600}
       <label>Search Block</label>
       <input id="searchInput" placeholder="Enter block (example: C-12)">
       <button class="find" id="searchBtn">Find</button>
+      <button style="background:#eee;border:none" id="resetBtn">Reset</button>
+      <div id="msgBox"></div>
     </div>
 
+    <!-- Admin controls removed from public view -->
     <div class="panel">
-      <button id="adminBtn">Admin Login</button>
+      <button id="showAdmin">Admin Login</button>
+    </div>
+
+    <div id="adminLoginPanel" class="panel">
       <input id="adminPass" type="password" placeholder="Password">
       <button class="unlock" id="unlockBtn">Unlock</button>
     </div>
@@ -75,6 +113,7 @@ let editor = false;
 let data = [];
 let layers = {};
 let counter = 0;
+let lastHighlighted = null;
 
 /* ================= MAP ================= */
 const map = L.map("map",{crs:L.CRS.Simple,minZoom:-4});
@@ -109,21 +148,73 @@ function render(){
 }
 
 /* ================= SEARCH ================= */
+
+function showMsg(msg,color){
+  msgBox.innerText = msg;
+  msgBox.style.display = "block";
+  msgBox.style.background=color;
+}
+
 searchBtn.onclick=()=>{
   const v = searchInput.value.trim().toUpperCase();
+  if(!v){ return; }
+
   const f = data.find(d=>d.expanded.includes(v));
-  if(!f) return alert("Block not found in Sector-3");
+
+  if(!f){
+    showMsg("Block not found in Sector-3","#e63946");
+    return;
+  }
+
+  if(lastHighlighted){
+    lastHighlighted.setStyle({color:"#ff9800",fillColor:"#ff9800"});
+  }
+
   const l = layers[f.id];
+
+  l.setStyle({
+    color:"#00c853",
+    fillColor:"#00c853",
+    fillOpacity:.55
+  });
+
+  lastHighlighted = l;
+
   map.fitBounds(l.getBounds().pad(.4));
+
+  showMsg("FOUND: "+v,"#008000");
 };
 
-/* ================= ADMIN ================= */
+/* RESET button */
+
+resetBtn.onclick = ()=>{
+  msgBox.style.display="none";
+  searchInput.value="";
+
+  if(lastHighlighted){
+    lastHighlighted.setStyle({
+      color:"#ff9800",
+      fillColor:"#ff9800",
+      fillOpacity:.35
+    });
+  }
+};
+
+/* ================= ADMIN LOGIN ================= */
+
+showAdmin.onclick = ()=>{
+ adminLoginPanel.style.display =
+ (adminLoginPanel.style.display=="block"?"none":"block");
+};
+
 unlockBtn.onclick=()=>{
   if(adminPass.value==="NALCO123"){
     admin=true;
     adminTools.style.display="block";
-    alert("Admin unlocked");
-  }else alert("Wrong password");
+    showMsg("Admin unlocked","#0047ab");
+  }else{
+    showMsg("Wrong password","#e63946");
+  }
 };
 
 /* ================= DRAW ================= */
@@ -132,7 +223,10 @@ const draw = new L.Control.Draw({
 });
 
 toggleDraw.onclick=()=>{
-  if(!admin) return alert("Admin only");
+  if(!admin){
+    showMsg("Admin only","#e63946");
+    return;
+  }
   editor=!editor;
   toggleDraw.innerText=editor?"Disable Drawing":"Enable Drawing";
   editor?map.addControl(draw):map.removeControl(draw);
@@ -144,7 +238,10 @@ map.on(L.Draw.Event.CREATED,e=>{
   if(!range) return;
 
   const exp = expand(range);
-  if(!exp.length) return alert("Invalid range");
+  if(!exp.length){
+    showMsg("Invalid range","#e63946");
+    return;
+  }
 
   const b = e.layer.getBounds();
   data.push({
@@ -168,7 +265,10 @@ downloadJson.onclick=()=>{
 
 /* ================= SAVE TO GITHUB ================= */
 saveGithub.onclick=async()=>{
-  if(!admin) return;
+  if(!admin){
+    showMsg("Admin only","#e63946");
+    return;
+  }
 
   let token = localStorage.getItem("GITHUB_TOKEN");
   if(!token){
@@ -199,7 +299,9 @@ saveGithub.onclick=async()=>{
     body:JSON.stringify(body)
   });
 
-  res.ok?alert("✅ Sector-3 Saved"):alert("❌ Save failed");
+  res.ok?
+  showMsg("Saved to GitHub","#0047ab"):
+  showMsg("Save failed","#e63946");
 };
 
 /* ================= UTIL ================= */
