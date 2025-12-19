@@ -303,6 +303,34 @@ function expand(s){
   for(let i=Math.min(a,b);i<=Math.max(a,b);i++)o.push(`${m[1]}-${i}`);
   return o;
 }
+/* MOBILE PATCH (MATCH SECTOR-1 WORKING BEHAVIOR) */
+@media(max-width:768px){
+
+  .content{
+    flex-direction:column !important;
+  }
+
+  .sidebar{
+    width:100% !important;
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
+    border-radius:0 0 16px 16px;
+  }
+
+  header{
+    font-size:16px;
+    padding:10px;
+  }
+
+  .map-wrap{
+    flex:1 !important;
+    min-height:55vh !important;   /* KEY FIX */
+  }
+
+  #map{
+    height:100% !important;
+  }
+}
+
 </script>
 </body>
 </html>
